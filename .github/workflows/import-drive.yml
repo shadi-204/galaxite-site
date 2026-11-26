@@ -14,56 +14,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download and extract website
-        env:
-          DRIVE_FILE_ID: 1BRv2KAAYy9z7ehtEJny1DmehJj6cgXB_
         run: |
-          python -  'PY'
-          import os, requests, zipfile, io, pathlib
-          file_id = os.environ["DRIVE_FILE_ID"]
-          session = requests.Session()
-          response = session.get("https://drive.google.com/uc", params={"export":"download","id":file_id}, timeout=90)
-          response.raise_for_status()
-          if "text/html" in response.headers.get("Content-Type",""):
-              from bs4 import BeautifulSoup
-              soup = BeautifulSoup(response.text, "html.parser")
-              form = soup.find("form")
-              if form:
-                  params = {i.get("name"): i.get("value","") for i in form.select("input[name]")}
-                  response = session.get(form.get("action","https://drive.google.com/uc"), params=params, timeout=90)
-                  response.raise_for_status()
-          payload = response.content
-          if not payload.startswith(b"PK"):
-              raise SystemExit("Google Drive did not return a ZIP archive; check Anyone with the link / Viewer access.")
-          archive = zipfile.ZipFile(io.BytesIO(payload))
-          archive.testzip()
-          entries = [n for n in archive.namelist() if not n.endswith("/")]
-          roots = {n.split("/")[0] for n in entries}
-          prefix = next(iter(roots)) + "/" if len(roots) == 1 and all("/" in n for n in entries) else ""
-          for name in entries:
-              rel = name[len(prefix):] if prefix and name.startswith(prefix) else name
-              if not rel or rel.startswith("../") or rel.startswith("/"):
-                  continue
-              target = pathlib.Path(rel)
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(archive.read(name))
-          if not pathlib.Path("index.html").exists():
-              raise SystemExit("index.html not found at repository root.")
-          PY
+          curl -L --fail --retry 3 "https://drive.google.com/uc?export=download&id=1BRv2KAAYy9z7ehtEJny1DmehJj6cgXB_" -o /tmp/galaxite-site.zip
+          unzip -t /tmp/galaxite-site.zip
+          mkdir -p /tmp/galaxite-extract
+          unzip -q /tmp/galaxite-site.zip -d /tmp/galaxite-extract
+          if [ -f /tmp/galaxite-extract/manga-site-v4/index.html ]; then
+            cp -a /tmp/galaxite-extract/manga-site-v4/. .
+          elif [ -f /tmp/galaxite-extract/index.html ]; then
+            cp -a /tmp/galaxite-extract/. .
+          else
+            echo "index.html not found in downloaded archive"
+            exit 1
+          fi
 
       - name: Apply Galaxite branding
         run: |
-          python -  'PY'
-          from pathlib import Path
-          for p in Path(".").rglob("*"):
-              if not p.is_file() or p.parts[0] == ".git" or ".github" in p.parts:
-                  continue
-              try:
-                  s = p.read_text(encoding="utf-8")
-              except (UnicodeDecodeError, OSError):
-                  continue
-              s = s.replace("مكتبة فورتكس", "Galaxite").replace("فورتكس", "Galaxite").replace("مكتبة Galaxite", "Galaxite")
-              p.write_text(s, encoding="utf-8")
-          PY
+          find . -type f -not -path './.git/*' -not -path './.github/*' -exec sed -i 's/مكتبة فورتكس/Galaxite/g; s/فورتكس/Galaxite/g; s/مكتبة Galaxite/Galaxite/g' {} +
 
       - name: Commit website files
         run: |
