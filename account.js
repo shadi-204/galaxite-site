@@ -139,13 +139,20 @@ function loginPage(next) {
     <form class="authform" id="af" novalidate><div class="seg" role="tablist"><button type="button" role="tab" aria-selected="${m === "in"}" data-m="in" class="${m === "in" ? "on" : ""}">دخول</button><button type="button" role="tab" aria-selected="${m === "up"}" data-m="up" class="${m === "up" ? "on" : ""}">حساب جديد</button></div>
     ${m === "up" ? `<label>الاسم<input id="an" autocomplete="nickname" maxlength="24" placeholder="اسمك في الموقع"></label>` : ""}
     <label>البريد الإلكتروني<input id="ae" type="email" autocomplete="email" inputmode="email" dir="ltr" placeholder="you@example.com"></label>
-    <label>كلمة المرور<input id="ap" type="password" autocomplete="${m === "in" ? "current-password" : "new-password"}" dir="ltr" placeholder="8 أحرف على الأقل"></label>
+    <label>كلمة المرور<span class="authpw"><input id="ap" type="password" autocomplete="${m === "in" ? "current-password" : "new-password"}" dir="ltr" placeholder="8 أحرف على الأقل"><button class="authpw-toggle" id="ap-toggle" type="button" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.1 0 2.1-.2 3-.5"/></svg></button></span></label>
     <p class="err" id="ae-err" role="alert" hidden></p>
     <button class="cta" id="asub" type="button">${m === "in" ? "دخول" : "إنشاء الحساب"}</button>
     ${m === "in" ? `<button type="button" class="lnk" id="forgot">نسيت كلمة المرور؟</button>` : ""}
     <div class="or"><span>أو</span></div>
     <button type="button" class="btn ghost wide" id="gg" ${real ? "" : "disabled"}>متابعة بحساب Google ${real ? "" : "<small>(يتطلب Firebase أو Supabase)</small>"}</button></form></div>`;
   reveal();
+  const pwInput = $("#ap"), pwToggle = $("#ap-toggle");
+  if (pwInput && pwToggle) pwToggle.onclick = () => {
+    const show = pwInput.type === "password";
+    pwInput.type = show ? "text" : "password";
+    pwToggle.setAttribute("aria-pressed", String(show));
+    pwToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور");
+  };
   document.querySelectorAll(".seg button").forEach((b) => (b.onclick = () => { mode = b.dataset.m; loginPage(next); }));
   const err = (t) => { const e = $("#ae-err"); e.textContent = t; e.hidden = !t; };
   const submit = async () => {
