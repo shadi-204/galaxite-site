@@ -95,6 +95,8 @@ function readerInit(w, ch) {
   $("#cj").onchange = (e) => (location.hash = `#/r/${slug(w)}/${e.target.value}`);
   const z = (d) => { const v = Math.max(360, Math.min(1200, store.get("zoom", 760) + d)); store.set("zoom", v); document.querySelector(".pages").style.maxWidth = v + "px"; };
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
+  const pageBox = document.querySelector(".pages");
+  if (pageBox && window.GALAXITE_DB_CATALOG) window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch).then((urls) => { if (urls.length && pageBox.isConnected) pageBox.innerHTML = urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy">`).join(""); });
   window.onscroll = () => { const m = document.documentElement.scrollHeight - innerHeight; const b = $("#pg"); if (b) b.style.width = (m > 0 ? Math.min(100, scrollY / m * 100) : 0) + "%"; else window.onscroll = null; };
 }
 function listPage(title, items, empty, chips) {
@@ -168,6 +170,7 @@ document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => {
 function applyTheme() { document.body.classList.toggle("light", light); $("#theme").innerHTML = light ? `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13A9 9 0 1111 3a7 7 0 0010 10z"/></svg>` : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`; }
 $("#theme").onclick = () => { light = !light; store.set("light", light); applyTheme(); };
 window.addEventListener("hashchange", route);
+window.addEventListener("galaxite:catalog-updated", route);
 applyTheme();
 $("#app").innerHTML = `<div class="skel hero"></div><div class="row">${"<div class='card'><div class='cover skel'></div></div>".repeat(8)}</div>`;
 setTimeout(route, 350);
