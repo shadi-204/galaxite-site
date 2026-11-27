@@ -157,14 +157,58 @@ const realUsers = () => Object.keys(load("vx-users", {})).map((e) => { const p =
 const DEMO_USERS = [["نجم الشتاء", "najm@example.com", 990, 140, 1], ["ظل الليل", "zill@example.com", 1105, 20, 0], ["قمر الصحراء", "qamar@example.com", 1240, 560, 1], ["صقر الشرق", "saqr@example.com", 760, 0, 0], ["ريم القارئة", "reem@example.com", 515, 75, 0]];
 const kpi = (b, s, d) => `<div class="stat"><b>${b}</b><span>${s}</span>${d ? `<small class="up">${d}</small>` : ""}</div>`;
 function demoNote() { return `<div class="warn"><b>أرقام تجريبية.</b> اللوحة ثابتة على GitHub Pages، فالأرقام دي أمثلة للشكل المقترح. بعد ربط Supabase أو Firebase وبوابة دفع (Paymob أو Stripe) هتتغذى ببياناتك الحقيقية.</div>`; }
-function usersView() {
-  const r = realUsers(), rows = [...r.map((u) => [u.name, u.email, u.xp, u.coins, u.vip ? 1 : 0, "حقيقي (هذا المتصفح)"]), ...DEMO_USERS.map((u) => [...u, "مثال"])];
-  $("#v").innerHTML = demoNote() + `<div class="stats">${kpi(rows.length.toLocaleString("ar-EG"), "إجمالي المستخدمين", "+٣ هذا الأسبوع")}${kpi(rows.filter((x) => x[4]).length.toLocaleString("ar-EG"), "مشتركو VIP")}${kpi("٤٢٪", "نسبة النشطين أسبوعيا")}${kpi("٣", "حسابات محظورة")}</div>
-  <div class="panel"><h2>قائمة المستخدمين</h2><div class="acts" style="margin:0 0 10px"><input id="us" type="search" placeholder="ابحث بالاسم أو البريد..." style="flex:1;min-width:200px"><select id="uf"><option value="">الكل</option><option value="1">VIP فقط</option></select></div>
-  <div class="tw"><table><thead><tr><th>الاسم</th><th>البريد</th><th>XP</th><th>العملات</th><th>الخطة</th><th>المصدر</th><th>إجراءات</th></tr></thead><tbody id="ub"></tbody></table></div></div>
-  <div class="panel"><h2>إجراءات مقترحة</h2><p style="color:var(--mut);margin:0;line-height:1.9">إضافة أو خصم عملات يدويا · منح VIP · حظر أو فك حظر · تغيير الدور (قارئ، مشرف، مترجم) · إعادة تعيين كلمة المرور · سجل نشاط كل مستخدم.</p></div>`;
-  const draw = () => { const q = $("#us").value.toLowerCase(), f = $("#uf").value; $("#ub").innerHTML = rows.filter((x) => (!q || (x[0] + x[1]).toLowerCase().includes(q)) && (!f || x[4])).map((x) => `<tr><td dir="auto">${esc(x[0])}</td><td dir="ltr">${esc(x[1])}</td><td>${(+x[2]).toLocaleString("ar-EG")}</td><td>${(+x[3]).toLocaleString("ar-EG")}</td><td>${x[4] ? '<span class="pill">VIP</span>' : "مجاني"}</td><td><small>${x[5]}</small></td><td><button class="btn" data-n="1">+ عملات</button> <button class="btn" data-n="2">حظر</button></td></tr>`).join(""); document.querySelectorAll("#ub button").forEach((b) => (b.onclick = () => toast("هذا الإجراء يحتاج قاعدة بيانات حقيقية"))); };
-  $("#us").oninput = draw; $("#uf").onchange = draw; draw();
+async function usersView() {
+  const host = $("#v");
+  host.innerHTML = '<div class="panel"><h2>المستخدمون والصلاحيات</h2><p class="empty">جارٍ تحميل الحسابات...</p></div>';
+  try {
+    const db = window.GALAXITE_SUPABASE_CLIENT;
+    if (!db) throw new Error("اتصال قاعدة البيانات غير متاح.");
+    const { data, error } = await db.from("profiles")
+      .select("id,username,display_name,role,created_at,xp,is_public")
+      .order("created_at", { ascending: false }).limit(500);
+    if (error) throw error;
+    const users = data || [];
+    const counts = { owner: users.filter((u) => u.role === "owner").length, admin: users.filter((u) => u.role === "admin").length, moderator: users.filter((u) => u.role === "moderator").length };
+    host.innerHTML = `
+      <div class="stats">
+        ${kpi(users.length.toLocaleString("ar-EG"), "إجمالي الحسابات")}
+        ${kpi(counts.owner, "مالكو الموقع")}
+        ${kpi(counts.admin, "مديرو الموقع")}
+        ${kpi(counts.moderator, "المشرفون")}
+      </div>
+      <div class="panel"><h2>قائمة المستخدمين</h2>
+        <div class="acts" style="margin:0 0 10px"><input id="us" type="search" placeholder="ابحث بالاسم أو اسم المستخدم..." style="flex:1;min-width:200px"></div>
+        <div class="tw"><table><thead><tr><th>المستخدم</th><th>اسم المستخدم</th><th>XP</th><th>تاريخ التسجيل</th><th>الصلاحية</th></tr></thead><tbody id="ub"></tbody></table></div>
+      </div>
+      <div class="panel"><p style="color:var(--mut);margin:0;line-height:1.9">تغيير الصلاحيات يتم مباشرة في قاعدة البيانات. لا يمكن تعيين مالك جديد من هذه القائمة أو إزالة صلاحية المالك الحالي.</p></div>`;
+    const draw = () => {
+      const q = $("#us").value.trim().toLowerCase();
+      const list = users.filter((u) => !q || ((u.display_name || "") + " " + (u.username || "")).toLowerCase().includes(q));
+      $("#ub").innerHTML = list.map((u) => {
+        const date = u.created_at ? new Date(u.created_at).toLocaleDateString("ar-EG") : "—";
+        const role = u.role === "owner" ? '<span class="pill">مالك</span>' : `<select data-user-role="${esc(u.id)}">${["user","moderator","admin"].map((r) => `<option value="${r}" ${u.role === r ? "selected" : ""}>${r === "user" ? "مستخدم" : r === "moderator" ? "مشرف" : "مدير"}</option>`).join("")}</select>`;
+        return `<tr><td><b>${esc(u.display_name || "بدون اسم")}</b></td><td dir="ltr">${esc(u.username || "—")}</td><td>${Number(u.xp || 0).toLocaleString("ar-EG")}</td><td>${esc(date)}</td><td>${role}</td></tr>`;
+      }).join("") || '<tr><td colspan="5" class="empty">لا توجد حسابات مطابقة.</td></tr>';
+    };
+    $("#us").oninput = draw; draw();
+    $("#ub").onchange = async (event) => {
+      const select = event.target.closest("[data-user-role]");
+      if (!select) return;
+      const id = select.dataset.userRole, nextRole = select.value;
+      select.disabled = true;
+      try {
+        const { error } = await db.rpc("assign_profile_role", { target_profile_id: id, requested_role: nextRole });
+        if (error) throw error;
+        toast("تم تحديث صلاحية المستخدم");
+      } catch (error) {
+        toast(error?.message || "تعذر تحديث الصلاحية");
+        usersView();
+      } finally { select.disabled = false; }
+    };
+  } catch (error) {
+    host.innerHTML = `<div class="panel"><h2>تعذر تحميل المستخدمين</h2><p class="empty">${esc(error?.message || "تحقق من صلاحيات حساب المالك.")}</p><button class="btn" id="retryUsers">إعادة المحاولة</button></div>`;
+    $("#retryUsers").onclick = usersView;
+  }
 }
 function salesView() {
   const days = ["س", "ح", "ن", "ث", "ر", "خ", "ج"], v = [120, 180, 90, 240, 310, 280, 420], mx = Math.max(...v);
