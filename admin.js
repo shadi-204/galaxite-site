@@ -284,24 +284,30 @@ function promoView() {
 }
 
 /* ---- نظرة عامة ---- */
-function dash() {
-  const marks = load("marks", []).length;
+async function dash() {
   const chs = works.reduce((a, w) => a + (+w.chapters || 0), 0);
   const avg = works.length ? (works.reduce((a, w) => a + (+w.rating || 0), 0) / works.length).toFixed(1) : "0";
-  const withPages = works.reduce((a, w) => a + Object.keys(w.pages || {}).length, 0);
+  let pageRows = 0;
+  try {
+    const db = window.GALAXITE_SUPABASE_CLIENT;
+    if (db) {
+      const { count, error } = await db.from("site_chapter_pages").select("id", { count: "exact", head: true });
+      if (error) throw error;
+      pageRows = count || 0;
+    }
+  } catch (error) { console.warn("Could not load page storage metrics", error); }
   $("#v").innerHTML = `<div class="stats">
     <div class="stat"><b>${works.length}</b><span>إجمالي الأعمال</span></div>
     <div class="stat"><b>${works.filter((w) => w.type === "manga").length}</b><span>مانجا</span></div>
     <div class="stat"><b>${works.filter((w) => w.type === "manhwa").length}</b><span>مانهوا</span></div>
-    <div class="stat"><b>${chs.toLocaleString("ar-EG")}</b><span>إجمالي الفصول</span></div>
+    <div class="stat"><b>${chs.toLocaleString("ar-EG")}</b><span>إجمالي الفصول المسجلة</span></div>
     <div class="stat"><b>${avg}</b><span>متوسط التقييم</span></div>
-    <div class="stat"><b>${withPages}</b><span>فصول لها صور</span></div></div>
-    <div class="panel"><h2>أعلى الأعمال تقييما</h2><div class="tw"><table><tbody>${[...works].sort((a, b) => b.rating - a.rating).slice(0, 5).map((w) => `<tr><td dir="auto">${esc(w.title)}</td><td><span class="pill">${w.type === "manga" ? "مانجا" : "مانهوا"}</span></td><td>⭐ ${esc(w.rating)}</td></tr>`).join("") || `<tr><td class="empty">لا توجد أعمال</td></tr>`}</tbody></table></div></div>
-    <div class="panel"><h2>إجراءات سريعة</h2><div class="acts" style="margin:0"><button class="btn pri" id="qa">+ إضافة عمل</button><button class="btn" id="qe">تصدير data.js</button></div>
-    <p style="color:var(--mut);font-size:13px;margin:12px 0 0">البيانات مخزنة في هذا المتصفح فقط (${marks} عمل في مفضلة الموقع هنا). لنشرها للجميع صدّر data.js وارفعه على GitHub.</p></div>`;
-  $("#qa").onclick = () => workForm(); $("#qe").onclick = exportData;
+    <div class="stat"><b>${pageRows.toLocaleString("ar-EG")}</b><span>صفحات محفوظة</span></div></div>
+    <div class="panel"><h2>أعلى الأعمال تقييمًا</h2><div class="tw"><table><tbody>${[...works].sort((a, b) => b.rating - a.rating).slice(0, 5).map((w) => `<tr><td dir="auto">${esc(w.title)}</td><td><span class="pill">${w.type === "manga" ? "مانجا" : "مانهوا"}</span></td><td>⭐ ${esc(w.rating)}</td></tr>`).join("") || `<tr><td class="empty">لا توجد أعمال</td></tr>`}</tbody></table></div></div>
+    <div class="panel"><h2>إجراءات سريعة</h2><div class="acts" style="margin:0"><button class="btn pri" id="qa">+ إضافة عمل</button><button class="btn" id="qc">إدارة الفصول</button></div>
+    <p style="color:var(--mut);font-size:13px;margin:12px 0 0">البيانات محفوظة مركزيًا في Supabase. عدد الصفحات المحفوظة يعكس الصور الموجودة فعلًا في تخزين الفصول.</p></div>`;
+  $("#qa").onclick = () => workForm(); $("#qc").onclick = () => { view = "chapters"; render(); };
 }
-
 /* ---- الأعمال ---- */
 function worksView() {
   if (realProvider() === "supabase" && !worksLoadedFromDb) {
