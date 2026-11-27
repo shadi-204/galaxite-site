@@ -149,15 +149,61 @@ function salesView() {
   <div class="panel"><h2>آخر العمليات</h2><div class="tw"><table><thead><tr><th>العملية</th><th>المستخدم</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>${[["باقة ١٠٠٠ عملة", "najm@example.com", "٢٠٠ ج", "مكتملة"], ["اشتراك VIP", "qamar@example.com", "١٥٠ ج", "مكتملة"], ["باقة ٣٠٠ عملة", "reem@example.com", "٧٥ ج", "معلقة"], ["باقة ٥٠٠ عملة", "saqr@example.com", "١١٠ ج", "مرفوضة"]].map((r) => `<tr><td>${r[0]}</td><td dir="ltr">${r[1]}</td><td>${r[2]}</td><td><span class="pill">${r[3]}</span></td></tr>`).join("")}</tbody></table></div></div>
   <div class="panel"><h2>إعدادات الأسعار</h2><p style="color:var(--mut);margin:0;line-height:1.9">سعر فتح الفصل بالعملات · عدد الفصول المقفولة لكل عمل · باقات العملات وأسعارها · كوبونات وخصومات · استرداد المدفوعات (يتم من بوابة الدفع).</p></div>`;
 }
-function communityView() {
-  const posts = load("vx-posts", []);
-  const rep = [["منشور فيه سبويلر بدون تحذير", "ظل الليل", "معلّق"], ["رسالة إعلانية", "مستخدم_٤٤", "معلّق"]];
-  $("#v").innerHTML = (posts.length ? "" : demoNote()) + `<div class="stats">${kpi((posts.length + 5).toLocaleString("ar-EG"), "إجمالي المنشورات")}${kpi(rep.length.toLocaleString("ar-EG"), "بلاغات معلقة")}${kpi("٩", "مراجعات جديدة")}${kpi("٠", "مستخدمون موقوفون")}</div>
-  <div class="panel"><h2>البلاغات</h2><div class="tw"><table><tbody>${rep.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td><span class="pill">${r[2]}</span></td><td><button class="btn" data-n="1">إخفاء</button> <button class="btn" data-n="2">تجاهل</button></td></tr>`).join("")}</tbody></table></div></div>
-  <div class="panel"><h2>منشورات من هذا المتصفح</h2>${posts.length ? `<div class="tw"><table><tbody>${posts.map((p, i) => `<tr><td dir="auto">${esc(p.txt)}</td><td>${esc(p.u)}</td><td><button class="btn" data-del="${i}">حذف</button></td></tr>`).join("")}</tbody></table></div>` : `<p style="color:var(--mut);margin:0">لا توجد منشورات كتبها قراء في هذا المتصفح بعد.</p>`}</div>
-  <div class="panel"><h2>القنوات والقواعد</h2><p style="color:var(--mut);margin:0;line-height:1.9">إنشاء وترتيب القنوات · كلمات محظورة · تثبيت منشور · فعاليات ومسابقات بمكافآت XP وعملات · أدوار المشرفين.</p></div>`;
-  document.querySelectorAll("[data-del]").forEach((b) => (b.onclick = () => { posts.splice(+b.dataset.del, 1); save("vx-posts", posts); toast("تم الحذف"); communityView(); }));
-  document.querySelectorAll("#v [data-n]").forEach((b) => (b.onclick = () => toast("يحتاج قاعدة بيانات حقيقية")));
+async function communityView() {
+  const host = $("#v");
+  host.innerHTML = '<div class="panel"><h2>بلاغات الأعمال والفصول</h2><p style="color:var(--mut)">جارٍ تحميل البلاغات...</p></div>';
+  try {
+    if (!window.GalaxiteReports) throw new Error("وحدة البلاغات غير محمّلة. حدّث الصفحة.");
+    const reports = await window.GalaxiteReports.list();
+    const open = reports.filter((r) => r.status === "open").length;
+    const reviewing = reports.filter((r) => r.status === "reviewing").length;
+    const resolved = reports.filter((r) => r.status === "resolved").length;
+    const statusLabel = { open: "جديد", reviewing: "قيد المراجعة", resolved: "تم الإصلاح", dismissed: "تم التجاهل" };
+    const typeLabel = { work: "عمل", chapter: "فصل", profile: "حساب", review: "مراجعة", comment: "تعليق" };
+    const rows = reports.map((r) => {
+      const safePath = typeof r.target_path === "string" && /^#\/[a-zA-Z0-9_./-]+$/.test(r.target_path) ? r.target_path : "";
+      const target = esc(r.target_title || (typeLabel[r.target_type] || "محتوى") + " · " + r.target_id);
+      const date = r.created_at ? new Date(r.created_at).toLocaleString("ar-EG") : "—";
+      const actions = ["resolved", "dismissed"].includes(r.status)
+        ? `<button class="btn sm" data-report-id="${esc(r.id)}" data-report-status="open">إعادة فتح</button>`
+        : `<button class="btn sm pri" data-report-id="${esc(r.id)}" data-report-status="resolved">تم الإصلاح</button> <button class="btn sm dan" data-report-id="${esc(r.id)}" data-report-status="dismissed">تجاهل</button> <button class="btn sm" data-report-id="${esc(r.id)}" data-report-status="reviewing">قيد المراجعة</button>`;
+      return `<tr>
+        <td><b>${esc(typeLabel[r.target_type] || r.target_type)}</b><br><small style="color:var(--mut)">${esc(date)}</small></td>
+        <td><b>${target}</b><br><small>${esc(r.reason)}</small>${r.details ? `<p style="margin:6px 0 0;color:var(--mut);white-space:pre-wrap">${esc(r.details)}</p>` : ""}</td>
+        <td><span class="pill">${esc(statusLabel[r.status] || r.status)}</span></td>
+        <td>${safePath ? `<a class="btn sm" href="index.html${esc(safePath)}" target="_blank" rel="noopener">فتح المحتوى</a>` : "—"}</td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join("");
+    host.innerHTML = `
+      <div class="stats">
+        <div class="stat"><b>${reports.length}</b><span>كل البلاغات</span></div>
+        <div class="stat"><b>${open}</b><span>بلاغات جديدة</span></div>
+        <div class="stat"><b>${reviewing}</b><span>قيد المراجعة</span></div>
+        <div class="stat"><b>${resolved}</b><span>تم إصلاحها</span></div>
+      </div>
+      <div class="panel"><h2>بلاغات المستخدمين</h2>
+        <p style="color:var(--mut);margin:0 0 12px">البلاغات تظهر هنا بعد إرسالها من صفحة العمل أو الفصل. افتح المحتوى، أصلح المشكلة، ثم أغلق البلاغ.</p>
+        <div class="tw"><table><thead><tr><th>النوع والتاريخ</th><th>المحتوى والسبب</th><th>الحالة</th><th>الرابط</th><th>الإجراء</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="empty">لا توجد بلاغات حتى الآن.</td></tr>'}</tbody></table></div>
+      </div>`;
+    host.onclick = async (event) => {
+      const button = event.target.closest("[data-report-id]");
+      if (!button) return;
+      button.disabled = true;
+      try {
+        await window.GalaxiteReports.update(button.dataset.reportId, button.dataset.reportStatus);
+        toast("تم تحديث حالة البلاغ");
+        communityView();
+      } catch (error) {
+        button.disabled = false;
+        toast(error?.message || "تعذر تحديث البلاغ");
+      }
+    };
+  } catch (error) {
+    host.innerHTML = `<div class="panel"><h2>تعذر تحميل البلاغات</h2><p style="color:var(--mut)">${esc(error?.message || "تحقق من اتصال قاعدة البيانات وصلاحيات حساب الإدارة.")}</p><button class="btn" id="retryReports">إعادة المحاولة</button></div>`;
+    $("#retryReports").onclick = communityView;
+  }
 }
 function promoView() {
   const pins = load("vx-pins", null) || [...works].sort((a, b) => b.rating - a.rating).slice(0, 3).map((w) => w.title);
