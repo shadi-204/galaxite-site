@@ -1,6 +1,6 @@
 // أضف أعمالك هنا. type: "manga" أو "manhwa".
 // cover: رابط صورة الغلاف (اختياري). pages: روابط صور صفحات الفصل (اختياري).
-const WORKS = [
+let WORKS = [
  {title:"Solo Leveling", type:"manhwa", genres:["أكشن","فانتازيا"], rating:9.1, status:"مكتمل", desc:"صياد ضعيف يحصل على قوة غامضة ويبدأ رحلة الصعود.", chapters:200},
  {title:"Tower of God", type:"manhwa", genres:["مغامرة","فانتازيا"], rating:8.8, status:"مستمر", desc:"صبي يتسلق برجًا غامضًا بحثًا عن صديقته.", chapters:600},
  {title:"The Beginning After the End", type:"manhwa", genres:["فانتازيا"], rating:8.9, status:"مستمر", desc:"ملك يُولد من جديد في عالم سحري.", chapters:200},
@@ -18,3 +18,4 @@ const WORKS = [
  {title:"Ash & Ember", type:"manhwa", genres:["فانتازيا", "دراما"], rating:8.2, status:"مكتمل", desc:"نجمان يتنازعان على عرش الرماد.", chapters:96},
  {title:"Quiet Rooftop", type:"manga", genres:["كوميدي", "دراما"], rating:7.6, status:"مستمر", desc:"أصدقاء وسطح مبنى وأسرار صغيرة.", chapters:18}
 ];
+window.GALAXITE_SET_WORKS = (rows) => { if (Array.isArray(rows) && rows.length) WORKS = rows; };
