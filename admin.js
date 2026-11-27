@@ -54,8 +54,6 @@ function realGate(p, msg) {
     <p style="text-align:center;margin:14px 0 0"><a href="index.html" style="color:var(--mut);font-size:13px">← العودة للموقع</a></p></form></div>`;
   const adminPw = $("#pw"), adminToggle = $("#pw-toggle");
   if (adminPw && adminToggle) adminToggle.onclick = () => { const show = adminPw.type === "password"; adminPw.type = show ? "text" : "password"; adminToggle.setAttribute("aria-pressed", String(show)); adminToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"); };
-  const adminPw = $("#pw"), adminToggle = $("#pw-toggle");
-  if (adminPw && adminToggle) adminToggle.onclick = () => { const show = adminPw.type === "password"; adminPw.type = show ? "text" : "password"; adminToggle.setAttribute("aria-pressed", String(show)); adminToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"); };
   $("#gf").onsubmit = async (e) => {
     e.preventDefault();
     try {
@@ -82,6 +80,8 @@ function gate() {
     <button class="btn pri" style="width:100%;justify-content:center;margin-top:8px">${auth ? "دخول" : "إنشاء كلمة المرور والدخول"}</button>
     <p style="text-align:center;margin:14px 0 0"><a href="index.html" style="color:var(--mut);font-size:13px">← العودة للموقع</a></p>
   </form></div>`;
+  const adminPw = $("#pw"), adminToggle = $("#pw-toggle");
+  if (adminPw && adminToggle) adminToggle.onclick = () => { const show = adminPw.type === "password"; adminPw.type = show ? "text" : "password"; adminToggle.setAttribute("aria-pressed", String(show)); adminToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"); };
   $("#gf").onsubmit = async (e) => {
     e.preventDefault();
     const pw = $("#pw").value;
