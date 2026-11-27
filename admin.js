@@ -159,6 +159,7 @@ const DEMO_USERS = [["نجم الشتاء", "najm@example.com", 990, 140, 1], ["
 const kpi = (b, s, d) => `<div class="stat"><b>${b}</b><span>${s}</span>${d ? `<small class="up">${d}</small>` : ""}</div>`;
 function demoNote() { return `<div class="warn"><b>أرقام تجريبية.</b> اللوحة ثابتة على GitHub Pages، فالأرقام دي أمثلة للشكل المقترح. بعد ربط Supabase أو Firebase وبوابة دفع (Paymob أو Stripe) هتتغذى ببياناتك الحقيقية.</div>`; }
 async function sourcesView() {
+  const workerReady = false;
   const host = $("#v");
   host.innerHTML = '<div class="panel"><h2>المصادر والأتمتة</h2><p class="empty">جارٍ تحميل المصادر...</p></div>';
   try {
@@ -175,14 +176,14 @@ async function sourcesView() {
     const jobLabel = { queued: "في الانتظار", running: "قيد التنفيذ", downloading: "جارٍ التنزيل", ocr: "استخراج النص", cleaning: "تنظيف الصور", translating: "الترجمة", typesetting: "تركيب النص", ready: "جاهز", published: "منشور", completed: "مكتمل", failed: "فشل", needs_attention: "يحتاج تدخل", cancelled: "ملغي" };
     host.innerHTML = `
       <div class="panel"><div class="top"><h2>مصادر المحتوى</h2><button class="btn pri" id="addSource">+ إضافة مصدر</button></div>
-        <p style="color:var(--mut);line-height:1.9">المصدر لا يعمل إلا بعد تغيير حالته إلى «مصرح» ثم إضافة عنوانه وتفعيله. Asura مضاف كإعداد فقط، ولا يتم الاتصال به أو استيراد محتواه قبل توفر الموافقة.</p>
+        <p style="color:var(--mut);line-height:1.9">المصادر تُسجل هنا وتظل متوقفة. التفعيل الفعلي لن يتاح إلا بعد نشر عامل الاستيراد، وتسجيل الإذن، وإضافة عنوان المصدر. Asura مضاف كإعداد فقط ولا يتم الاتصال به.</p>
         <div class="tw"><table><thead><tr><th>المصدر</th><th>عنوان المصدر</th><th>المعالج</th><th>حالة الإذن</th><th>التفعيل</th><th>الفحص كل</th></tr></thead><tbody>
         ${(sources || []).map((source) => `<tr>
           <td><b>${esc(source.display_name)}</b><br><small dir="ltr">${esc(source.source_key)}</small></td>
           <td><input type="url" data-source-url="${esc(source.id)}" value="${esc(source.base_url || "")}" placeholder="https://..." style="min-width:180px" aria-label="عنوان المصدر"></td>
           <td dir="ltr">${esc(source.adapter_key)}</td>
           <td><select data-source-auth="${esc(source.id)}">${["pending","authorized","restricted"].map((state) => `<option value="${state}" ${source.authorization_status === state ? "selected" : ""}>${authLabel[state]}</option>`).join("")}</select></td>
-          <td><label class="sw"><input type="checkbox" data-source-enabled="${esc(source.id)}" ${source.enabled ? "checked" : ""} ${source.authorization_status !== "authorized" || !source.base_url ? "disabled" : ""}> مفعل</label></td>
+          <td><label class="sw"><input type="checkbox" data-source-enabled="${esc(source.id)}" ${source.enabled ? "checked" : ""} ${!workerReady || source.authorization_status !== "authorized" || !source.base_url ? "disabled" : ""}> مفعل</label></td>
           <td>${Number(source.poll_interval_minutes)} دقيقة</td>
         </tr>`).join("") || '<tr><td colspan="6" class="empty">لا توجد مصادر.</td></tr>'}
         </tbody></table></div>
@@ -235,6 +236,7 @@ async function sourcesView() {
           sourcesView();
         } else if (enabled) {
           const source = sources.find((item) => item.id === enabled.dataset.sourceEnabled);
+          if (!workerReady) { enabled.checked = false; toast("عامل الاستيراد لم يتم نشره بعد؛ المصدر سيظل متوقفًا."); return; }
           if (!source || source.authorization_status !== "authorized" || !source.base_url) { enabled.checked = false; toast("لا يمكن تفعيل المصدر قبل تسجيل الموافقة وإضافة عنوانه"); return; }
           const { error } = await db.from("site_content_sources").update({ enabled: enabled.checked }).eq("id", source.id);
           if (error) throw error;
