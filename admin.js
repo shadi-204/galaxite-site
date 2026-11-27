@@ -37,6 +37,7 @@ async function initSdk(p) {
   } else {
     await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2");
     const c = supabase.createClient(CFG.supabase.url, CFG.supabase.anonKey);
+    window.GALAXITE_SUPABASE_CLIENT = c;
     sdk = { signIn: async (e, pw) => { const { data, error } = await c.auth.signInWithPassword({ email: e, password: pw }); if (error) throw error; return data.user.email; }, signOut: () => c.auth.signOut(),
       current: async () => { const { data } = await c.auth.getSession(); return data.session ? data.session.user.email : null; } };
   }
