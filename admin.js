@@ -211,11 +211,18 @@ async function usersView() {
   }
 }
 function salesView() {
-  const days = ["س", "ح", "ن", "ث", "ر", "خ", "ج"], v = [120, 180, 90, 240, 310, 280, 420], mx = Math.max(...v);
-  $("#v").innerHTML = demoNote() + `<div class="stats">${kpi("٤٬٢٨٠ ج.م", "إيراد هذا الشهر", "+١٨٪")}${kpi("٣٦٤", "عمليات شراء")}${kpi("٨٧", "مشتركو VIP نشطين")}${kpi("١٢٬٥٠٠", "عملات مباعة")}${kpi("٣٣٠٠٠", "عملات مستهلكة")}${kpi("٢", "مدفوعات معلقة")}</div>
-  <div class="panel"><h2>الإيراد آخر ٧ أيام (جنيه)</h2><svg viewBox="0 0 350 130" style="width:100%;max-width:560px" role="img" aria-label="رسم بياني للإيراد">${v.map((x, i) => `<rect x="${i * 50 + 8}" y="${110 - x / mx * 95}" width="34" height="${x / mx * 95}" rx="6" fill="#ef4444" opacity="${0.45 + x / mx * 0.55}"/><text x="${i * 50 + 25}" y="125" text-anchor="middle" font-size="11" fill="#9ba0b8">${days[i]}</text><text x="${i * 50 + 25}" y="${106 - x / mx * 95}" text-anchor="middle" font-size="10" fill="#ecedf5">${x}</text>`).join("")}</svg></div>
-  <div class="panel"><h2>آخر العمليات</h2><div class="tw"><table><thead><tr><th>العملية</th><th>المستخدم</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>${[["باقة ١٠٠٠ عملة", "najm@example.com", "٢٠٠ ج", "مكتملة"], ["اشتراك VIP", "qamar@example.com", "١٥٠ ج", "مكتملة"], ["باقة ٣٠٠ عملة", "reem@example.com", "٧٥ ج", "معلقة"], ["باقة ٥٠٠ عملة", "saqr@example.com", "١١٠ ج", "مرفوضة"]].map((r) => `<tr><td>${r[0]}</td><td dir="ltr">${r[1]}</td><td>${r[2]}</td><td><span class="pill">${r[3]}</span></td></tr>`).join("")}</tbody></table></div></div>
-  <div class="panel"><h2>إعدادات الأسعار</h2><p style="color:var(--mut);margin:0;line-height:1.9">سعر فتح الفصل بالعملات · عدد الفصول المقفولة لكل عمل · باقات العملات وأسعارها · كوبونات وخصومات · استرداد المدفوعات (يتم من بوابة الدفع).</p></div>`;
+  $("#v").innerHTML = `
+    <div class="panel"><h2>المدفوعات والاشتراكات</h2>
+      <p style="color:var(--mut);line-height:1.9;margin:0">بوابة الدفع غير مفعّلة حاليًا. لن نعرض أرقام إيرادات أو عمليات شراء تجريبية على أنها بيانات حقيقية. ربط الدفع يحتاج اختيار مزود الدفع وإعداد مفاتيحه وسياسات الاشتراك أولًا.</p>
+    </div>
+    <div class="panel"><h3>المطلوب قبل تفعيل الدفع</h3>
+      <ul style="color:var(--mut);line-height:2;margin:0;padding-right:20px">
+        <li>اختيار مزود دفع مناسب لبلد تشغيل الموقع.</li>
+        <li>إعداد خطط الاشتراك والمزايا والأسعار.</li>
+        <li>إعداد Webhooks والتحقق من المدفوعات من الخادم.</li>
+        <li>اختبار الشراء والتجديد والإلغاء قبل استقبال أموال حقيقية.</li>
+      </ul>
+    </div>`;
 }
 async function communityView() {
   const host = $("#v");
@@ -274,13 +281,13 @@ async function communityView() {
   }
 }
 function promoView() {
-  const pins = load("vx-pins", null) || [...works].sort((a, b) => b.rating - a.rating).slice(0, 3).map((w) => w.title);
-  const an = load("vx-announce", "");
-  $("#v").innerHTML = `<div class="panel"><h2>الأعمال المثبتة في الرئيسية (حتى ٣)</h2><div class="tw"><table><tbody>${works.map((w, i) => `<tr><td><input type="checkbox" data-p="${i}" ${pins.includes(w.title) ? "checked" : ""} aria-label="تثبيت ${esc(w.title)}"></td><td dir="auto">${esc(w.title)}</td><td>⭐ ${esc(w.rating)}</td></tr>`).join("")}</tbody></table></div><div class="acts" style="margin-top:10px"><button class="btn pri" id="sp">حفظ التثبيت</button></div></div>
-  <div class="panel"><h2>رسالة إعلان أعلى الموقع</h2><input id="an" value="${esc(an)}" placeholder="مثال: خصم ٢٠٪ على باقات العملات هذا الأسبوع" style="width:100%"><div class="acts" style="margin-top:10px"><button class="btn pri" id="sa">حفظ</button></div></div>
-  <div class="panel"><h2>البانر المتحرك والأقسام</h2><p style="color:var(--mut);margin:0;line-height:1.9">اختيار أعمال البانر · ترتيب أقسام الرئيسية (الأشهر اليوم، المثبتة، آخر الإصدارات) · أعمال المستخدمين المميزة · ألوان الهوية.</p></div>`;
-  $("#sp").onclick = () => { const sel = [...document.querySelectorAll("[data-p]:checked")].map((c) => works[+c.dataset.p].title).slice(0, 3); save("vx-pins", sel); toast("تم حفظ المثبت (يظهر في الرئيسية)"); };
-  $("#sa").onclick = () => { save("vx-announce", $("#an").value.trim()); toast("تم حفظ الإعلان"); };
+  $("#v").innerHTML = `
+    <div class="panel"><h2>الواجهة والمثبت</h2>
+      <p style="color:var(--mut);line-height:1.9;margin:0">إعدادات تثبيت الأعمال والإعلانات العلوية ما زالت محفوظة محليًا في النسخة القديمة. أوقفت عرضها كأنها إعدادات مشتركة حتى ننقلها إلى قاعدة البيانات بشكل صحيح.</p>
+    </div>
+    <div class="panel"><h3>المرحلة التالية</h3>
+      <p style="color:var(--mut);line-height:1.9;margin:0">هنضيف إعدادات مركزية لترتيب الأعمال المميزة ورسائل الموقع، بحيث أي تغيير تحفظه يظهر لكل الزوار وليس على جهازك فقط.</p>
+    </div>`;
 }
 
 /* ---- نظرة عامة ---- */
