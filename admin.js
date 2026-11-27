@@ -131,14 +131,15 @@ const ICON = {
   promo: '<path d="M12 2l3 6.9 7.4.7-5.6 5 1.7 7.3L12 17.8 5.5 21.9l1.7-7.3-5.6-5 7.4-.7z"/>',
   dash: '<path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/>',
   works: '<path d="M4 4h4v16H4zM10 4h4v16h-4zM16 5l4 1-3 14-4-1z"/>',
+  sources: '<circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 7l3 9M16 7l-3 9M8 6h8"/>',
   chapters: '<path d="M6 3h12v18l-6-4-6 4z"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>'
 };
 const ic = (n) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
-const NAV = [["dash", "الرئيسية"], ["works", "الأعمال"], ["chapters", "الفصول"], ["users", "المستخدمين"], ["sales", "المبيعات والعملات"], ["community", "المجتمع والإشراف"], ["promo", "الواجهة والمثبت"], ["settings", "الإعدادات"]];
+const NAV = [["dash", "الرئيسية"], ["works", "الأعمال"], ["chapters", "الفصول"], ["sources", "المصادر والأتمتة"], ["users", "المستخدمين"], ["sales", "المدفوعات"], ["community", "البلاغات"], ["promo", "الواجهة والمثبت"], ["settings", "الإعدادات"]];
 function render() {
   if (!sessionStorage.getItem(KEY_SESSION)) return gate();
-  const titles = { dash: "نظرة عامة", works: "إدارة الأعمال", chapters: "إدارة الفصول", users: "المستخدمين", sales: "المبيعات والعملات", community: "المجتمع والإشراف", promo: "الواجهة والمثبت", settings: "الإعدادات" };
+  const titles = { dash: "نظرة عامة", works: "إدارة الأعمال", chapters: "إدارة الفصول", sources: "المصادر والأتمتة", users: "المستخدمين", sales: "المدفوعات", community: "البلاغات", promo: "الواجهة والمثبت", settings: "الإعدادات" };
   root.innerHTML = `<div class="app"><nav class="side" aria-label="القائمة">
     <div class="logo brand" style="padding:6px 14px 16px">◢ Galaxite</div>
     ${NAV.map(([k, l]) => `<a href="#${k}" class="${view === k ? "on" : ""}">${ic(k)}<span>${l}</span></a>`).join("")}
@@ -147,9 +148,9 @@ function render() {
     <button class="nav" id="out">${ic("settings")}<span>خروج</span></button>
   </nav><main class="main"><div class="top"><h1>${titles[view]}</h1><span class="pill" dir="ltr">${esc(OWNER_EMAIL)}</span></div><div id="v"></div></main></div>`;
   $("#out").onclick = async () => { sessionStorage.removeItem(KEY_SESSION); try { if (sdk) await sdk.signOut(); } catch {} gate(); };
-  ({ dash, works: worksView, chapters: chaptersView, users: usersView, sales: salesView, community: communityView, promo: promoView, settings })[view]();
+  ({ dash, works: worksView, chapters: chaptersView, sources: sourcesView, users: usersView, sales: salesView, community: communityView, promo: promoView, settings })[view]();
 }
-window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (["dash", "works", "chapters", "users", "sales", "community", "promo", "settings"].includes(h)) { view = h; render(); } });
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (["dash", "works", "chapters", "sources", "users", "sales", "community", "promo", "settings"].includes(h)) { view = h; render(); } });
 
 
 /* ---- أقسام الإدارة الموسعة (v3): الأرقام التجريبية موضحة، والبيانات الحقيقية تحتاج قاعدة بيانات ---- */
@@ -157,6 +158,64 @@ const realUsers = () => Object.keys(load("vx-users", {})).map((e) => { const p =
 const DEMO_USERS = [["نجم الشتاء", "najm@example.com", 990, 140, 1], ["ظل الليل", "zill@example.com", 1105, 20, 0], ["قمر الصحراء", "qamar@example.com", 1240, 560, 1], ["صقر الشرق", "saqr@example.com", 760, 0, 0], ["ريم القارئة", "reem@example.com", 515, 75, 0]];
 const kpi = (b, s, d) => `<div class="stat"><b>${b}</b><span>${s}</span>${d ? `<small class="up">${d}</small>` : ""}</div>`;
 function demoNote() { return `<div class="warn"><b>أرقام تجريبية.</b> اللوحة ثابتة على GitHub Pages، فالأرقام دي أمثلة للشكل المقترح. بعد ربط Supabase أو Firebase وبوابة دفع (Paymob أو Stripe) هتتغذى ببياناتك الحقيقية.</div>`; }
+async function sourcesView() {
+  const host = $("#v");
+  host.innerHTML = '<div class="panel"><h2>المصادر والأتمتة</h2><p class="empty">جارٍ تحميل المصادر...</p></div>';
+  try {
+    const db = window.GALAXITE_SUPABASE_CLIENT;
+    const [{ data: sources, error: sourceError }, { data: jobs, error: jobError }] = await Promise.all([
+      db.from("site_content_sources").select("id,source_key,display_name,base_url,adapter_key,enabled,authorization_status,poll_interval_minutes").order("display_name"),
+      db.from("site_ingestion_jobs").select("id,source_id,job_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(30)
+    ]);
+    if (sourceError) throw sourceError;
+    if (jobError) throw jobError;
+    const authLabel = { pending: "بانتظار الموافقة", authorized: "مصرح", restricted: "موقوف" };
+    const jobLabel = { queued: "في الانتظار", running: "قيد التنفيذ", completed: "مكتمل", failed: "فشل", needs_attention: "يحتاج تدخل", cancelled: "ملغي" };
+    host.innerHTML = `
+      <div class="panel"><h2>مصادر المحتوى</h2>
+        <p style="color:var(--mut);line-height:1.9">المصدر لا يعمل إلا بعد تغيير حالته إلى «مصرح» ثم تفعيله. Asura مضاف كإعداد فقط، ولا يتم الاتصال به أو استيراد محتواه قبل توفر الموافقة.</p>
+        <div class="tw"><table><thead><tr><th>المصدر</th><th>المعالج</th><th>حالة الإذن</th><th>التفعيل</th><th>الفحص كل</th></tr></thead><tbody>
+        ${(sources || []).map((source) => `<tr>
+          <td><b>${esc(source.display_name)}</b><br><small dir="ltr">${esc(source.source_key)}</small></td>
+          <td dir="ltr">${esc(source.adapter_key)}</td>
+          <td><select data-source-auth="${esc(source.id)}">${["pending","authorized","restricted"].map((state) => `<option value="${state}" ${source.authorization_status === state ? "selected" : ""}>${authLabel[state]}</option>`).join("")}</select></td>
+          <td><label class="sw"><input type="checkbox" data-source-enabled="${esc(source.id)}" ${source.enabled ? "checked" : ""} ${source.authorization_status !== "authorized" ? "disabled" : ""}> مفعل</label></td>
+          <td>${Number(source.poll_interval_minutes)} دقيقة</td>
+        </tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مصادر.</td></tr>'}
+        </tbody></table></div>
+      </div>
+      <div class="panel"><h2>آخر مهام الاستيراد والمعالجة</h2>
+        <div class="tw"><table><thead><tr><th>النوع</th><th>الحالة</th><th>المحاولات</th><th>آخر خطأ</th><th>التاريخ</th></tr></thead><tbody>
+        ${(jobs || []).map((job) => `<tr><td>${esc(job.job_type)}</td><td>${esc(jobLabel[job.status] || job.status)}</td><td>${Number(job.attempts)}</td><td>${esc(job.last_error || "—")}</td><td>${job.created_at ? esc(new Date(job.created_at).toLocaleString("ar-EG")) : "—"}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مهام بعد. لم يتم تشغيل أي مستورد أو عامل معالجة.</td></tr>'}
+        </tbody></table></div>
+      </div>`;
+    host.onchange = async (event) => {
+      const auth = event.target.closest("[data-source-auth]");
+      const enabled = event.target.closest("[data-source-enabled]");
+      try {
+        if (auth) {
+          const next = auth.value;
+          const { error } = await db.from("site_content_sources").update({ authorization_status: next, enabled: next === "authorized" ? undefined : false }).eq("id", auth.dataset.sourceAuth);
+          if (error) throw error;
+          toast("تم تحديث حالة إذن المصدر");
+          sourcesView();
+        } else if (enabled) {
+          const source = sources.find((item) => item.id === enabled.dataset.sourceEnabled);
+          if (!source || source.authorization_status !== "authorized") { enabled.checked = false; toast("لا يمكن تفعيل مصدر قبل تسجيل الموافقة"); return; }
+          const { error } = await db.from("site_content_sources").update({ enabled: enabled.checked }).eq("id", source.id);
+          if (error) throw error;
+          toast(enabled.checked ? "تم تفعيل المصدر" : "تم إيقاف المصدر");
+        }
+      } catch (error) {
+        toast(error?.message || "تعذر تحديث المصدر");
+        sourcesView();
+      }
+    };
+  } catch (error) {
+    host.innerHTML = `<div class="panel"><h2>تعذر تحميل إعدادات المصادر</h2><p class="empty">${esc(error?.message || "تحقق من صلاحيات قاعدة البيانات.")}</p><button class="btn" id="retrySources">إعادة المحاولة</button></div>`;
+    $("#retrySources").onclick = sourcesView;
+  }
+}
 async function usersView() {
   const host = $("#v");
   host.innerHTML = '<div class="panel"><h2>المستخدمون والصلاحيات</h2><p class="empty">جارٍ تحميل الحسابات...</p></div>';
