@@ -67,6 +67,11 @@ async function getSdk() {
   }
   return sdk;
 }
+window.GALAXITE_GET_SUPABASE_CLIENT = async () => {
+  if (realProvider() !== "supabase") return null;
+  await getSdk();
+  return window.GALAXITE_SUPABASE_CLIENT || null;
+};
 
 /* ---------- حالة المستخدم ---------- */
 let session = ls.get("vx-session", null);       // البريد أو null
