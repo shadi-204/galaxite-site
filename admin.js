@@ -325,6 +325,7 @@ function workForm(i) {
     if (!title) return;
     if (cover && !/^https?:\/\//i.test(cover)) { $("#fe").textContent = "رابط الغلاف لازم يبدأ بـ https://"; return; }
     if (works.some((x, k) => k !== i && x.title.toLowerCase() === title.toLowerCase())) { $("#fe").textContent = "فيه عمل بنفس العنوان."; return; }
+    if (i === undefined && works.some((x) => x.id === workIdFromTitle(title))) { $("#fe").textContent = "معرّف العمل موجود بالفعل. اختار عنوانًا مختلفًا أو عدّل العمل الموجود."; return; }
     const n = { ...w, title, type: $("#ty").value, status: $("#st").value, rating: +$("#ra").value || 0, chapters: Math.max(0, +$("#ch").value || 0), genres: $("#g").value.split(/[،,]/).map((s) => s.trim()).filter(Boolean), desc: $("#d").value.trim(), cover };
     try {
       if (realProvider() === "supabase") {
@@ -333,7 +334,7 @@ function workForm(i) {
           id: n.id || workIdFromTitle(title), title: n.title, type: n.type, genres: n.genres,
           rating: n.rating, status: n.status, description: n.desc, chapter_count: n.chapters,
           cover_url: n.cover || null, is_published: n.is_published !== false,
-          sort_order: Number.isInteger(n.sort_order) ? n.sort_order : (i === undefined ? 0 : i)
+          sort_order: Number.isInteger(n.sort_order) ? n.sort_order : (i === undefined ? Math.max(0, ...works.map((x) => Number(x.sort_order) || 0)) + 1 : i)
         };
         const { error } = await db.from("site_works").upsert(payload, { onConflict: "id" });
         if (error) throw error;
