@@ -69,11 +69,12 @@ function series(w) {
   <p>${w.genres.map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p><p>${esc(w.desc)}</p>
   <a class="cta" href="#/r/${slug(w)}/1">الفصل الأول</a><a class="cta alt" href="#/r/${slug(w)}/${w.chapters}">آخر فصل</a>
   ${prog[w.title] ? `<a class="cta alt" href="#/r/${slug(w)}/${prog[w.title]}">أكمل من الفصل ${prog[w.title]}</a>` : ""}
-  <button class="cta alt" id="mark">${marks.includes(w.title) ? "★ في المفضلة" : "☆ أضف للمفضلة"}</button></div></div>
+  <button class="cta alt" id="mark">${marks.includes(w.title) ? "★ في المفضلة" : "☆ أضف للمفضلة"}</button><button class="cta alt" id="reportWork" type="button">الإبلاغ عن مشكلة في العمل</button></div></div>
   <h3 class="h">الفصول (${w.chapters})</h3>
   <div class="chs">${Array.from({ length: n }, (_, i) => w.chapters - i).map((c) => `<a class="ch" href="#/r/${slug(w)}/${c}"><span>الفصل ${c}</span><small>${VX.premium(w, c) ? (VX.locked(w, c) ? "● مميز" : "○ مفتوح") : ago[c % ago.length]}${(prog[w.title] || 0) === c ? " · وصلت هنا" : ""}</small></a>`).join("")}</div>${w.chapters > 50 ? `<button class="cta alt" id="more" style="margin-top:12px">${showAll ? "عرض أقل" : "عرض كل الفصول (" + w.chapters + ")"}</button>` : ""}`;
   if ($("#more")) $("#more").onclick = () => { showAll = !showAll; series(w); };
   $("#mark").onclick = () => { marks = marks.includes(w.title) ? marks.filter((t) => t !== w.title) : [...marks, w.title]; store.set("marks", marks); series(w); };
+  if ($("#reportWork")) $("#reportWork").onclick = () => window.GalaxiteReports?.open({ targetType: "work", targetId: slug(w), targetTitle: w.title, targetPath: `#/s/${slug(w)}` });
 }
 function reader(w, ch) {
   ch = Math.max(1, Math.min(w.chapters, ch));
@@ -85,11 +86,12 @@ function reader(w, ch) {
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
   <span>${ch > 1 ? `<a href="#/r/${slug(w)}/${ch - 1}">السابق</a>` : ""}${ch < w.chapters ? `<a href="#/r/${slug(w)}/${ch + 1}">التالي</a>` : ""}</span></div>
   <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.map((p, i) => p ? `<img src="${esc(p)}" alt="" loading="lazy">` : `<div class="page" style="background:${grad(w.title + ch, (i + 1) * 40)}">صفحة ${i + 1}<small>ضع صور الفصل في data.js</small></div>`).join("")}</div>
-  <div class="rend"><p>نهاية الفصل ${ch}</p>${ch < w.chapters ? `<a class="cta" href="#/r/${slug(w)}/${ch + 1}">الفصل التالي ←</a>` : `<p>وصلت لآخر فصل متاح 🎉</p>`}<a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
+  <div class="rend"><p>نهاية الفصل ${ch}</p>${ch < w.chapters ? `<a class="cta" href="#/r/${slug(w)}/${ch + 1}">الفصل التالي ←</a>` : `<p>وصلت لآخر فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
   <div class="rbar"><span>${ch > 1 ? `<a href="#/r/${slug(w)}/${ch - 1}">السابق</a>` : ""}${ch < w.chapters ? `<a href="#/r/${slug(w)}/${ch + 1}">التالي</a>` : ""}</span></div>`;
 }
 function readerInit(w, ch) {
   if (!$("#cj")) return;
+  if ($("#reportChapter")) $("#reportChapter").onclick = () => window.GalaxiteReports?.open({ targetType: "chapter", targetId: `${slug(w)}#${ch}`, targetTitle: `${w.title} - الفصل ${ch}`, targetPath: `#/r/${slug(w)}/${ch}` });
   $("#cj").onchange = (e) => (location.hash = `#/r/${slug(w)}/${e.target.value}`);
   const z = (d) => { const v = Math.max(360, Math.min(1200, store.get("zoom", 760) + d)); store.set("zoom", v); document.querySelector(".pages").style.maxWidth = v + "px"; };
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
