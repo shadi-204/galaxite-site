@@ -1,8 +1,11 @@
-// إعدادات تسجيل الدخول. بدون مفاتيح تعمل لوحة الإدارة ببوابة تجريبية.
-// مفاتيح Firebase وSupabase (anon) مصممة لتكون علنية. الأمان الحقيقي يأتي من قواعد الأمان في مشروعك.
+// إعدادات تسجيل الدخول في Galaxite.
+// مفتاح Supabase publishable مخصص للاستخدام في المتصفح؛ لا تضع service_role key هنا.
 window.AUTH_CONFIG = {
-  provider: "demo",              // "demo" أو "firebase" أو "supabase"
+  provider: "supabase",
   ownerEmail: "ownermail@gmail.com",
   firebase: { apiKey: "", authDomain: "", projectId: "", appId: "" },
-  supabase: { url: "", anonKey: "" }
+  supabase: {
+    url: "https://daqjqiuyrxtlutqjraxc.supabase.co",
+    anonKey: "sb_publishable_aaGiJ_QTZ-9kSuQli6Klyg_ko496RRj"
+  }
 };
