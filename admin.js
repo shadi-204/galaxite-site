@@ -172,7 +172,7 @@ async function sourcesView() {
     if (jobError) throw jobError;
     if (processingError) throw processingError;
     const authLabel = { pending: "بانتظار الموافقة", authorized: "مصرح", restricted: "موقوف" };
-    const jobLabel = { queued: "في الانتظار", running: "قيد التنفيذ", completed: "مكتمل", failed: "فشل", needs_attention: "يحتاج تدخل", cancelled: "ملغي" };
+    const jobLabel = { queued: "في الانتظار", running: "قيد التنفيذ", downloading: "جارٍ التنزيل", ocr: "استخراج النص", cleaning: "تنظيف الصور", translating: "الترجمة", typesetting: "تركيب النص", ready: "جاهز", published: "منشور", completed: "مكتمل", failed: "فشل", needs_attention: "يحتاج تدخل", cancelled: "ملغي" };
     host.innerHTML = `
       <div class="panel"><h2>مصادر المحتوى</h2>
         <p style="color:var(--mut);line-height:1.9">المصدر لا يعمل إلا بعد تغيير حالته إلى «مصرح» ثم تفعيله. Asura مضاف كإعداد فقط، ولا يتم الاتصال به أو استيراد محتواه قبل توفر الموافقة.</p>
