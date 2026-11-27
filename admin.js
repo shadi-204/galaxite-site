@@ -353,7 +353,7 @@ function workForm(i) {
     <div class="row2"><div><label for="ty">النوع</label><select id="ty"><option value="manga" ${w.type === "manga" ? "selected" : ""}>مانجا</option><option value="manhwa" ${w.type === "manhwa" ? "selected" : ""}>مانهوا</option></select></div>
     <div><label for="st">الحالة</label><select id="st">${["مستمر", "مكتمل", "متوقف"].map((s) => `<option ${w.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div></div>
     <div class="row2"><div><label for="ra">التقييم (0-10)</label><input id="ra" type="number" min="0" max="10" step="0.1" value="${esc(w.rating)}"></div>
-    <div><label for="ch">عدد الفصول</label><input id="ch" type="number" min="0" value="${esc(w.chapters)}"></div></div>
+    <div><label for="ch">عدد الفصول (يُحدّث تلقائيًا)</label><input id="ch" type="number" min="0" value="${esc(w.chapters)}" readonly></div></div>
     <label for="g">التصنيفات (مفصولة بفاصلة)</label><input id="g" list="gl" value="${esc((w.genres || []).join("، "))}"><datalist id="gl">${[...new Set(works.flatMap((x) => x.genres || []))].map((g) => `<option value="${esc(g)}"></option>`).join("")}</datalist><div class="gchips" id="gch">${[...new Set(works.flatMap((x) => x.genres || []))].map((g) => `<button type="button" class="btn sm" data-gc="${esc(g)}">+ ${esc(g)}</button>`).join(" ")}</div>
     <label for="d">الوصف</label><textarea id="d" rows="3">${esc(w.desc)}</textarea>
     <label for="c">رابط صورة الغلاف (https)</label><input id="c" type="url" placeholder="https://..." value="${esc(w.cover)}">
@@ -376,7 +376,7 @@ function workForm(i) {
         const db = window.GALAXITE_SUPABASE_CLIENT;
         const payload = {
           id: n.id || workIdFromTitle(title), title: n.title, type: n.type, genres: n.genres,
-          rating: n.rating, status: n.status, description: n.desc, chapter_count: n.chapters,
+          rating: n.rating, status: n.status, description: n.desc, chapter_count: Number(w.chapters || 0),
           cover_url: n.cover || null, is_published: n.is_published !== false,
           sort_order: Number.isInteger(n.sort_order) ? n.sort_order : (i === undefined ? Math.max(0, ...works.map((x) => Number(x.sort_order) || 0)) + 1 : i)
         };
