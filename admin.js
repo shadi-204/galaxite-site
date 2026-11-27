@@ -558,7 +558,7 @@ async function chaptersView() {
             .select("id,page_number,storage_path").eq("chapter_id", chapterId).order("page_number");
           if (oldError) throw oldError;
           oldPages = old || [];
-          const startAt = replacePages ? 0 : oldPages.length;
+          const startAt = replacePages ? 0 : Math.max(0, ...oldPages.map((page) => Number(page.page_number) || 0));
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "page";
