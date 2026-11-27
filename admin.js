@@ -59,6 +59,10 @@ function realGate(p, msg) {
     try {
       const s = await initSdk(p); const mail = await s.signIn($("#em").value.trim(), $("#pw").value);
       if (!isOwner(mail)) { await s.signOut(); $("#ge").textContent = "هذا الحساب غير مسموح له بالدخول."; return; }
+      if (p === "supabase") {
+        const { data: allowed, error: roleError } = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_admin");
+        if (roleError || allowed !== true) { await s.signOut(); $("#ge").textContent = "الحساب مسجل، لكن صلاحية المالك لم تُفعّل له في قاعدة البيانات بعد. تأكد من البريد أولًا."; return; }
+      }
       sessionStorage.setItem(KEY_SESSION, "1"); render();
     } catch { $("#ge").textContent = "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات."; }
   };
@@ -348,7 +352,12 @@ const h0 = location.hash.slice(1); if (["dash", "works", "chapters", "users", "s
 (async () => {
   const rp = realProvider();
   if (rp && sessionStorage.getItem(KEY_SESSION)) {
-    try { const s = await initSdk(rp); const m = await s.current(); if (!isOwner(m)) sessionStorage.removeItem(KEY_SESSION); } catch { sessionStorage.removeItem(KEY_SESSION); }
+    try {
+      const s = await initSdk(rp); const m = await s.current();
+      let allowed = true;
+      if (rp === "supabase" && m) { const result = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_admin"); allowed = !result.error && result.data === true; }
+      if (!isOwner(m) || !allowed) sessionStorage.removeItem(KEY_SESSION);
+    } catch { sessionStorage.removeItem(KEY_SESSION); }
   }
   render();
 })();
