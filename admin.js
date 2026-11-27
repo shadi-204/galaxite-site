@@ -427,7 +427,7 @@ async function chaptersView() {
         err.textContent = "استخدم صور JPG أو PNG أو WEBP أو AVIF، وبحد أقصى 15MB للصورة."; return;
       }
       save.disabled = true; save.textContent = "جارٍ الحفظ...";
-      let uploaded = [], oldPages = [], chapterId = "";
+      let uploaded = [], oldPages = [], chapterId = "", pagesCommitted = false;
       try {
         const { data: savedChapter, error: chapterError } = await db.from("site_chapters").upsert({
           work_id: w.id, chapter_number: number, title: title || null,
@@ -435,6 +435,7 @@ async function chaptersView() {
         }, { onConflict: "work_id,chapter_number" }).select("id").single();
         if (chapterError) throw chapterError;
         chapterId = savedChapter.id;
+        if (replacePages && !files.length) throw new Error("اختار الصور الجديدة قبل استبدال الصور القديمة.");
         if (files.length) {
           const { data: old, error: oldError } = await db.from("site_chapter_pages")
             .select("id,page_number,storage_path").eq("chapter_id", chapterId).order("page_number");
@@ -461,6 +462,7 @@ async function chaptersView() {
             if (replacePages && oldPages.length) await db.from("site_chapter_pages").insert(oldPages);
             throw insertError;
           }
+          pagesCommitted = true;
           if (replacePages && oldPages.length) {
             await db.storage.from("galaxite-chapters").remove(oldPages.map((page) => page.storage_path));
           }
@@ -473,7 +475,7 @@ async function chaptersView() {
         toast(files.length ? "تم حفظ الفصل ورفع الصور" : "تم حفظ بيانات الفصل");
         chaptersView();
       } catch (error) {
-        if (uploaded.length) await db.storage.from("galaxite-chapters").remove(uploaded.map((page) => page.storage_path));
+        if (uploaded.length && !pagesCommitted) await db.storage.from("galaxite-chapters").remove(uploaded.map((page) => page.storage_path));
         err.textContent = error?.message || "تعذر حفظ الفصل. لم يتم اعتماد العملية.";
       } finally {
         save.disabled = false; save.textContent = "حفظ الفصل والصور";
