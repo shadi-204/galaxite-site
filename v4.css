@@ -33,3 +33,13 @@
 @media screen and (max-width:360px) {
  .wgrid, .v4grid, .v4cats, .v4fr { grid-template-columns:minmax(0,1fr); }
 }
+
+/* Password visibility control: preserves the original auth card and input styling. */
+.authpw{position:relative;display:block;width:100%}
+.authpw input{width:100%;padding-inline-end:48px!important}
+.authpw-toggle{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.authpw-toggle:hover{color:var(--text);background:var(--card)}
+.authpw-toggle:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.authpw-toggle .eye-closed{display:none}
+.authpw-toggle[aria-pressed="true"] .eye-open{display:none}
+.authpw-toggle[aria-pressed="true"] .eye-closed{display:block}
