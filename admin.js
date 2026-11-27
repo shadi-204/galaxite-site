@@ -8,8 +8,27 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 let works = load(KEY_WORKS, null) || JSON.parse(JSON.stringify(WORKS));
+let worksLoadedFromDb = false, worksLoadError = "";
 let view = "dash", toastT;
 const persist = () => save(KEY_WORKS, works);
+const workIdFromTitle = (title) => String(title || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+async function loadWorksFromDatabase() {
+  if (realProvider() !== "supabase") return false;
+  const db = window.GALAXITE_SUPABASE_CLIENT;
+  if (!db) throw new Error("اتصال قاعدة البيانات غير جاهز.");
+  const { data, error } = await db.from("site_works")
+    .select("id,title,type,genres,rating,status,description,chapter_count,cover_url,is_published,sort_order")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  works = (data || []).map((w) => ({
+    id: w.id, title: w.title, type: w.type, genres: w.genres || [],
+    rating: Number(w.rating || 0), status: w.status || "مستمر",
+    desc: w.description || "", chapters: Number(w.chapter_count || 0),
+    cover: w.cover_url || "", is_published: w.is_published, sort_order: w.sort_order
+  }));
+  worksLoadedFromDb = true; worksLoadError = "";
+  return true;
+}
 
 /* ---- تجزئة كلمة المرور في المتصفح فقط (PBKDF2). لا تُخزن كلمة المرور نفسها ---- */
 const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -63,8 +82,9 @@ function realGate(p, msg) {
         const { data: allowed, error: roleError } = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_admin");
         if (roleError || allowed !== true) { await s.signOut(); $("#ge").textContent = "الحساب مسجل، لكن صلاحية المالك لم تُفعّل له في قاعدة البيانات بعد. تأكد من البريد أولًا."; return; }
       }
+      if (p === "supabase") await loadWorksFromDatabase();
       sessionStorage.setItem(KEY_SESSION, "1"); render();
-    } catch { $("#ge").textContent = "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات."; }
+    } catch (error) { $("#ge").textContent = error?.message || "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات."; }
   };
 }
 
@@ -357,6 +377,7 @@ const h0 = location.hash.slice(1); if (["dash", "works", "chapters", "users", "s
       let allowed = true;
       if (rp === "supabase" && m) { const result = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_admin"); allowed = !result.error && result.data === true; }
       if (!isOwner(m) || !allowed) sessionStorage.removeItem(KEY_SESSION);
+      else if (rp === "supabase") await loadWorksFromDatabase();
     } catch { sessionStorage.removeItem(KEY_SESSION); }
   }
   render();
