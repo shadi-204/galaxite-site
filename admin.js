@@ -163,12 +163,14 @@ async function sourcesView() {
   host.innerHTML = '<div class="panel"><h2>المصادر والأتمتة</h2><p class="empty">جارٍ تحميل المصادر...</p></div>';
   try {
     const db = window.GALAXITE_SUPABASE_CLIENT;
-    const [{ data: sources, error: sourceError }, { data: jobs, error: jobError }] = await Promise.all([
+    const [{ data: sources, error: sourceError }, { data: jobs, error: jobError }, { data: processing, error: processingError }] = await Promise.all([
       db.from("site_content_sources").select("id,source_key,display_name,base_url,adapter_key,enabled,authorization_status,poll_interval_minutes").order("display_name"),
-      db.from("site_ingestion_jobs").select("id,source_id,job_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(30)
+      db.from("site_ingestion_jobs").select("id,source_id,job_type,status,attempts,last_error,created_at").order("created_at", { ascending: false }).limit(30),
+      db.from("site_chapter_processing_jobs").select("id,chapter_id,source_id,status,total_pages,completed_pages,last_error,updated_at").order("updated_at", { ascending: false }).limit(30)
     ]);
     if (sourceError) throw sourceError;
     if (jobError) throw jobError;
+    if (processingError) throw processingError;
     const authLabel = { pending: "بانتظار الموافقة", authorized: "مصرح", restricted: "موقوف" };
     const jobLabel = { queued: "في الانتظار", running: "قيد التنفيذ", completed: "مكتمل", failed: "فشل", needs_attention: "يحتاج تدخل", cancelled: "ملغي" };
     host.innerHTML = `
@@ -184,9 +186,14 @@ async function sourcesView() {
         </tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مصادر.</td></tr>'}
         </tbody></table></div>
       </div>
-      <div class="panel"><h2>آخر مهام الاستيراد والمعالجة</h2>
+      <div class="panel"><h2>آخر مهام الاستيراد</h2>
         <div class="tw"><table><thead><tr><th>النوع</th><th>الحالة</th><th>المحاولات</th><th>آخر خطأ</th><th>التاريخ</th></tr></thead><tbody>
-        ${(jobs || []).map((job) => `<tr><td>${esc(job.job_type)}</td><td>${esc(jobLabel[job.status] || job.status)}</td><td>${Number(job.attempts)}</td><td>${esc(job.last_error || "—")}</td><td>${job.created_at ? esc(new Date(job.created_at).toLocaleString("ar-EG")) : "—"}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مهام بعد. لم يتم تشغيل أي مستورد أو عامل معالجة.</td></tr>'}
+        ${(jobs || []).map((job) => `<tr><td>${esc(job.job_type)}</td><td>${esc(jobLabel[job.status] || job.status)}</td><td>${Number(job.attempts)}</td><td>${esc(job.last_error || "—")}</td><td>${job.created_at ? esc(new Date(job.created_at).toLocaleString("ar-EG")) : "—"}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مهام استيراد حتى الآن.</td></tr>'}
+        </tbody></table></div>
+      </div>
+      <div class="panel"><h2>معالجة الفصول</h2>
+        <div class="tw"><table><thead><tr><th>الفصل</th><th>المرحلة</th><th>التقدم</th><th>آخر خطأ</th><th>آخر تحديث</th></tr></thead><tbody>
+        ${(processing || []).map((job) => `<tr><td dir="ltr">${esc(String(job.chapter_id).slice(0, 8))}</td><td>${esc(jobLabel[job.status] || job.status)}</td><td>${Number(job.completed_pages)} / ${Number(job.total_pages)}</td><td>${esc(job.last_error || "—")}</td><td>${job.updated_at ? esc(new Date(job.updated_at).toLocaleString("ar-EG")) : "—"}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مهام معالجة حتى الآن. عامل OCR والترجمة لم يتم تشغيله بعد.</td></tr>'}
         </tbody></table></div>
       </div>`;
     host.onchange = async (event) => {
