@@ -53,6 +53,8 @@ function realGate(p, msg) {
     <p style="text-align:center;margin:14px 0 0"><a href="index.html" style="color:var(--mut);font-size:13px">← العودة للموقع</a></p></form></div>`;
   const adminPw = $("#pw"), adminToggle = $("#pw-toggle");
   if (adminPw && adminToggle) adminToggle.onclick = () => { const show = adminPw.type === "password"; adminPw.type = show ? "text" : "password"; adminToggle.setAttribute("aria-pressed", String(show)); adminToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"); };
+  const adminPw = $("#pw"), adminToggle = $("#pw-toggle");
+  if (adminPw && adminToggle) adminToggle.onclick = () => { const show = adminPw.type === "password"; adminPw.type = show ? "text" : "password"; adminToggle.setAttribute("aria-pressed", String(show)); adminToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"); };
   $("#gf").onsubmit = async (e) => {
     e.preventDefault();
     try {
@@ -73,7 +75,7 @@ function gate() {
     <p style="color:var(--mut);margin:6px 0 0">${auth ? "سجّل الدخول للمتابعة" : "أول استخدام: اختر كلمة مرور لهذا المتصفح"}</p>
     <div class="warn"><b>بوابة تجريبية فقط.</b> الموقع ثابت على GitHub Pages، فمفيش تحقق حقيقي من الهوية. أي حد يفتح الموقع من متصفح تاني يقدر ينشئ كلمة مرور خاصة بيه، والبيانات بتتحفظ في متصفحك بس. للحماية الحقيقية اربط Firebase Auth أو Supabase (الخطوات في README).</div>
     <label for="em">البريد</label><input id="em" type="email" value="${esc(OWNER_EMAIL)}" readonly>
-    <label for="pw">كلمة المرور</label><input id="pw" type="password" required minlength="8" autocomplete="${auth ? "current-password" : "new-password"}">
+    <label for="pw">كلمة المرور</label><span class="admin-pw"><input id="pw" type="password" required minlength="8" autocomplete="${auth ? "current-password" : "new-password"}"><button class="admin-pw-toggle" id="pw-toggle" type="button" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.1 0 2.1-.2 3-.5"/></svg></button></span>
     ${auth ? "" : `<label for="pw2">تأكيد كلمة المرور</label><input id="pw2" type="password" required minlength="8" autocomplete="new-password">`}
     <div class="err" id="ge" role="alert"></div>
     <button class="btn pri" style="width:100%;justify-content:center;margin-top:8px">${auth ? "دخول" : "إنشاء كلمة المرور والدخول"}</button>
