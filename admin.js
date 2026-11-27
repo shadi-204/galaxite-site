@@ -176,14 +176,15 @@ async function sourcesView() {
     host.innerHTML = `
       <div class="panel"><h2>مصادر المحتوى</h2>
         <p style="color:var(--mut);line-height:1.9">المصدر لا يعمل إلا بعد تغيير حالته إلى «مصرح» ثم تفعيله. Asura مضاف كإعداد فقط، ولا يتم الاتصال به أو استيراد محتواه قبل توفر الموافقة.</p>
-        <div class="tw"><table><thead><tr><th>المصدر</th><th>المعالج</th><th>حالة الإذن</th><th>التفعيل</th><th>الفحص كل</th></tr></thead><tbody>
+        <div class="tw"><table><thead><tr><th>المصدر</th><th>عنوان المصدر</th><th>المعالج</th><th>حالة الإذن</th><th>التفعيل</th><th>الفحص كل</th></tr></thead><tbody>
         ${(sources || []).map((source) => `<tr>
           <td><b>${esc(source.display_name)}</b><br><small dir="ltr">${esc(source.source_key)}</small></td>
+          <td><input type="url" data-source-url="${esc(source.id)}" value="${esc(source.base_url || "")}" placeholder="https://..." style="min-width:180px" aria-label="عنوان المصدر"></td>
           <td dir="ltr">${esc(source.adapter_key)}</td>
           <td><select data-source-auth="${esc(source.id)}">${["pending","authorized","restricted"].map((state) => `<option value="${state}" ${source.authorization_status === state ? "selected" : ""}>${authLabel[state]}</option>`).join("")}</select></td>
-          <td><label class="sw"><input type="checkbox" data-source-enabled="${esc(source.id)}" ${source.enabled ? "checked" : ""} ${source.authorization_status !== "authorized" ? "disabled" : ""}> مفعل</label></td>
+          <td><label class="sw"><input type="checkbox" data-source-enabled="${esc(source.id)}" ${source.enabled ? "checked" : ""} ${source.authorization_status !== "authorized" || !source.base_url ? "disabled" : ""}> مفعل</label></td>
           <td>${Number(source.poll_interval_minutes)} دقيقة</td>
-        </tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مصادر.</td></tr>'}
+        </tr>`).join("") || '<tr><td colspan="6" class="empty">لا توجد مصادر.</td></tr>'}
         </tbody></table></div>
       </div>
       <div class="panel"><h2>آخر مهام الاستيراد</h2>
@@ -199,8 +200,16 @@ async function sourcesView() {
     host.onchange = async (event) => {
       const auth = event.target.closest("[data-source-auth]");
       const enabled = event.target.closest("[data-source-enabled]");
+      const urlInput = event.target.closest("[data-source-url]");
       try {
-        if (auth) {
+        if (urlInput) {
+          const value = urlInput.value.trim();
+          if (value && !/^https:\/\//i.test(value)) throw new Error("عنوان المصدر لازم يبدأ بـ https://");
+          const { error } = await db.from("site_content_sources").update({ base_url: value || null, enabled: false }).eq("id", urlInput.dataset.sourceUrl);
+          if (error) throw error;
+          toast("تم حفظ عنوان المصدر، وسيظل متوقفًا حتى استكمال الإذن والتفعيل");
+          sourcesView();
+        } else if (auth) {
           const next = auth.value;
           const { error } = await db.from("site_content_sources").update({ authorization_status: next, enabled: next === "authorized" ? undefined : false }).eq("id", auth.dataset.sourceAuth);
           if (error) throw error;
@@ -208,7 +217,7 @@ async function sourcesView() {
           sourcesView();
         } else if (enabled) {
           const source = sources.find((item) => item.id === enabled.dataset.sourceEnabled);
-          if (!source || source.authorization_status !== "authorized") { enabled.checked = false; toast("لا يمكن تفعيل مصدر قبل تسجيل الموافقة"); return; }
+          if (!source || source.authorization_status !== "authorized" || !source.base_url) { enabled.checked = false; toast("لا يمكن تفعيل المصدر قبل تسجيل الموافقة وإضافة عنوانه"); return; }
           const { error } = await db.from("site_content_sources").update({ enabled: enabled.checked }).eq("id", source.id);
           if (error) throw error;
           toast(enabled.checked ? "تم تفعيل المصدر" : "تم إيقاف المصدر");
