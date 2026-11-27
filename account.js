@@ -54,6 +54,7 @@ async function getSdk() {
   } else if (p === "supabase") {
     await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2");
     const c = supabase.createClient(CFG.supabase.url, CFG.supabase.anonKey);
+    window.GALAXITE_SUPABASE_CLIENT = c;
     const ok = ({ data, error }) => { if (error) throw error; return data; };
     sdk = {
       signUp: async (e, pw) => { const data = ok(await c.auth.signUp({ email: e, password: pw })); return { email: data.user?.email || e, needsConfirmation: !data.session }; },
