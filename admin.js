@@ -498,25 +498,40 @@ function exportData() {
   toast("تم تنزيل data.js");
 }
 function settings() {
-  $("#v").innerHTML = `<div class="panel"><h2>البيانات</h2><div class="acts" style="margin-top:0"><button class="btn pri" id="ex">تصدير data.js</button><label class="btn" style="margin:0;cursor:pointer">استيراد data.js<input id="im" type="file" accept=".js,.json" hidden></label><button class="btn dan" id="rs">إعادة ضبط للبيانات الأصلية</button></div>
-    <p style="color:var(--mut);font-size:13px">بعد التصدير ارفع data.js مكان القديم على GitHub ليظهر التحديث للجميع. التعديلات هنا تظهر على هذا المتصفح فقط.</p><pre class="code" id="pv"></pre></div>
-    <div class="panel"><h2>الحساب</h2><p style="margin:0 0 8px">البريد: <b dir="ltr">${esc(OWNER_EMAIL)}</b></p>
-    <div class="row2"><div><label for="np">كلمة مرور جديدة (٨ أحرف+)</label><input id="np" type="password" minlength="8" autocomplete="new-password"></div><div><label>&nbsp;</label><button class="btn" id="cpw" style="width:100%;justify-content:center">تغيير كلمة المرور</button></div></div>
-    <div class="err" id="se" role="alert"></div>
-    ${realProvider() ? "" : `<div class="warn">كلمة المرور محفوظة كتجزئة مشفرة (PBKDF2) في متصفحك فقط، وليست في الكود ولا على GitHub. لو نسيتها: امسح بيانات الموقع من المتصفح (وستفقد التعديلات غير المصدّرة).</div>`}</div>
-    <div class="panel"><h2>ربط تسجيل دخول حقيقي لاحقا</h2><p style="color:var(--mut);margin:0">هذه اللوحة بوابة تجريبية. للحماية الحقيقية اربط Firebase Authentication أو Supabase Auth واسمح بالدخول لبريد المالك فقط، وخزّن الأعمال في قاعدة بيانات بقواعد أمان. الخطوات التفصيلية في README.</p></div>`;
-  $("#pv").textContent = exportText().slice(0, 700) + (exportText().length > 700 ? "\n..." : "");
-  $("#ex").onclick = exportData;
-  $("#im").onchange = async (e) => {
-    const f = e.target.files[0]; if (!f) return;
+  $("#v").innerHTML = `
+    <div class="panel"><h2>حالة النظام</h2>
+      <div class="stats">
+        <div class="stat"><b>${works.length}</b><span>عمل في قاعدة البيانات</span></div>
+        <div class="stat"><b>${works.filter((w) => w.is_published !== false).length}</b><span>عمل منشور</span></div>
+        <div class="stat"><b>Supabase</b><span>قاعدة البيانات</span></div>
+      </div>
+      <p style="color:var(--mut);line-height:1.9;margin:0">الأعمال والفصول وبلاغات المحتوى تُحفظ مركزيًا في قاعدة البيانات والتخزين، وأي تعديل ناجح يظهر للمستخدمين بعد تحديث الموقع. لا تعتمد هذه اللوحة على تصدير data.js لحفظ التعديلات.</p>
+    </div>
+    <div class="panel"><h2>الحساب والأمان</h2>
+      <p style="margin:0 0 12px">حساب المالك: <b dir="ltr">${esc(OWNER_EMAIL)}</b></p>
+      <label for="np">كلمة مرور جديدة (٨ أحرف على الأقل)</label>
+      <div class="acts"><input id="np" type="password" minlength="8" autocomplete="new-password" style="flex:1;min-width:200px"><button class="btn pri" id="cpw">تغيير كلمة المرور</button></div>
+      <div class="err" id="se" role="alert"></div>
+      <p style="color:var(--mut);font-size:12px;margin:10px 0 0">تغيير كلمة المرور يتم مباشرة عبر Supabase Auth. لا تشارك كلمة المرور أو مفاتيح الإدارة في المحادثات.</p>
+    </div>
+    <div class="panel"><h2>حالة النسخة</h2>
+      <p style="color:var(--mut);line-height:1.9;margin:0">الموقع المنشور لا يتأثر بتعديلات فرع التطوير إلا بعد اعتمادها ونشرها. يتم اختبار ملفات JavaScript تلقائيًا قبل دمج التغييرات.</p>
+    </div>`;
+  $("#cpw").onclick = async () => {
+    const password = $("#np").value;
+    const errorBox = $("#se");
+    if (password.length < 8) { errorBox.textContent = "كلمة المرور لازم تكون ٨ أحرف على الأقل."; return; }
+    const db = window.GALAXITE_SUPABASE_CLIENT;
+    if (!db) { errorBox.textContent = "اتصال Supabase غير متاح."; return; }
+    $("#cpw").disabled = true; errorBox.textContent = "جارٍ تحديث كلمة المرور...";
     try {
-      const t = await f.text(); const m = t.match(/\[[\s\S]*\]/); const arr = JSON.parse(m[0]);
-      if (!Array.isArray(arr) || arr.some((x) => !x.title || !x.type)) throw 0;
-      works = arr; persist(); toast("تم الاستيراد"); settings();
-    } catch { $("#se").textContent = "ملف غير صالح. لازم يكون data.js بصيغة JSON صحيحة."; }
+      const { error } = await db.auth.updateUser({ password });
+      if (error) throw error;
+      $("#np").value = ""; errorBox.textContent = "تم تحديث كلمة المرور بنجاح.";
+    } catch (error) {
+      errorBox.textContent = error?.message || "تعذر تغيير كلمة المرور.";
+    } finally { $("#cpw").disabled = false; }
   };
-  $("#rs").onclick = () => { modal(`<h2>إعادة الضبط؟</h2><p style="color:var(--mut)">سيتم حذف تعديلاتك المحلية والرجوع لبيانات data.js الأصلية.</p><div class="acts"><button class="btn dan" id="y2">إعادة ضبط</button><button class="btn" id="n2">إلغاء</button></div>`); $("#n2").onclick = closeModal; $("#y2").onclick = () => { localStorage.removeItem(KEY_WORKS); works = JSON.parse(JSON.stringify(WORKS)); closeModal(); toast("تمت إعادة الضبط"); render(); }; };
-  $("#cpw").onclick = async () => { const p = $("#np").value; if (p.length < 8) { $("#se").textContent = "٨ أحرف على الأقل."; return; } save(KEY_AUTH, await hash(p)); $("#np").value = ""; $("#se").textContent = ""; toast("تم تغيير كلمة المرور"); };
 }
 const h0 = location.hash.slice(1); if (["dash", "works", "chapters", "users", "sales", "community", "promo", "settings"].includes(h0)) view = h0;
 (async () => {
