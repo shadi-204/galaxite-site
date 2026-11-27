@@ -9,14 +9,6 @@
  #theme { order:3; flex:0 0 42px; }
  #mnav, #tabs { display:none !important; }
  #q { order:4; display:block; flex:1 0 100%; width:100%; min-width:0; max-width:none; }
- .authwrap { display:grid !important; grid-template-columns:1fr 1fr !important; width:100% !important; max-width:900px !important; min-width:0 !important; margin:16px auto 22px !important; border-radius:26px; }
- .authside { display:block !important; width:auto !important; min-width:0 !important; padding:32px 24px !important; }
- .authside h2 { font-size:26px !important; margin:0 0 10px; }
- .authside p { font-size:15px; line-height:1.8; }
- .authform { display:grid !important; width:auto !important; min-width:0 !important; padding:28px !important; gap:14px; }
- .authform label { min-width:0; }
- .authform input { width:100%; min-width:0; max-width:100%; font-size:16px; }
- .authform button { max-width:100%; min-height:44px; }
  main#app { min-height:0; padding:12px 12px 110px; }
  .foot { width:100%; max-width:100%; min-width:0; margin:22px 0 100px; padding:20px 16px; justify-content:center; text-align:center; }
  .foot > div, .foot nav { width:100%; justify-content:center; }
@@ -30,17 +22,8 @@
  .stabs button, .ltabs button { white-space:nowrap; flex:0 0 auto; }
 }
 @media screen and (max-width:760px) {
- .authwrap { display:grid !important; grid-template-columns:minmax(0,1fr) !important; max-width:560px !important; border-radius:18px; }
- .authside { padding:16px 18px !important; }
- .authside h2 { font-size:22px !important; margin:0 0 6px; }
- .authside p { font-size:13px; line-height:1.65; margin:0; }
- .authside .perks, .authside .note { display:none !important; }
- .authform { padding:18px !important; gap:12px; }
 }
 @media screen and (max-width:520px) {
- .authwrap { border-radius:16px; }
- .authside { padding:14px 16px !important; }
- .authform { padding:16px !important; }
  .hero { min-height:260px; }
  .stat3 { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
  .prof { padding:16px; gap:14px; }
@@ -49,5 +32,4 @@
 }
 @media screen and (max-width:360px) {
  .wgrid, .v4grid, .v4cats, .v4fr { grid-template-columns:minmax(0,1fr); }
- .authform { padding:14px !important; }
 }
