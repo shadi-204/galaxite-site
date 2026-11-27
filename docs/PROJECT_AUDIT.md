@@ -18,6 +18,7 @@
 - Added a shared Supabase-backed reporting module.
 - Added report actions on work details and chapter reader pages.
 - Added a real report inbox in the authenticated admin dashboard, with open/reviewing/resolved/dismissed states.
+- Added a live catalog loader that reads published works from Supabase and requests signed URLs for stored chapter pages when they exist.
 - Added database support for `work` and `chapter` report targets, report details, target labels/paths, and lookup indexes.
 - Restricted report listing and updates to accounts for which `public.is_admin()` is true.
 - Added an owner-role check to the Supabase admin login path.
@@ -26,9 +27,9 @@
 
 ## Important blockers before a public test
 
-1. The configured owner account exists in Supabase but its email is not confirmed and its profile role is still `user`. The database's primary-owner assignment/protection logic still references a different email. Do not grant owner privileges until the configured owner has verified control of the email and the role migration is reviewed.
+1. The configured owner account exists in Supabase but its email is not confirmed and its profile role is still `user`. A verified-email trigger is now in place to grant the owner role only after confirmation; the existing verified owner role is preserved as a fallback.
 2. The current admin work/chapter CRUD screens still use browser-local data. They must be connected to `site_works`, `site_chapters`, `site_chapter_pages`, and the private storage bucket before reports can be repaired centrally.
-3. The public reader still uses the static catalog and placeholder pages. It needs a database-backed chapter/page loader and signed image URLs.
+3. The live catalog/page loader is in place, but chapter page images have not yet been uploaded; reader testing with real page assets remains pending.
 4. OCR, text removal/inpainting, translation, font selection, typesetting, and worker orchestration remain to be built.
 5. Asura and any other source adapters must remain disabled for importing/republication until the required permission is obtained. Internal testing should use user-owned or authorized sample pages.
 
