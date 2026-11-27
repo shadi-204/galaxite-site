@@ -56,7 +56,7 @@ async function getSdk() {
     const c = supabase.createClient(CFG.supabase.url, CFG.supabase.anonKey);
     const ok = ({ data, error }) => { if (error) throw error; return data; };
     sdk = {
-      signUp: async (e, pw) => ok(await c.auth.signUp({ email: e, password: pw })).user?.email || e,
+      signUp: async (e, pw) => { const data = ok(await c.auth.signUp({ email: e, password: pw })); return { email: data.user?.email || e, needsConfirmation: !data.session }; },
       signIn: async (e, pw) => ok(await c.auth.signInWithPassword({ email: e, password: pw })).user.email,
       google: async () => { ok(await c.auth.signInWithOAuth({ provider: "google" })); return null; },
       reset: async (e) => ok(await c.auth.resetPasswordForEmail(e)),
@@ -157,8 +157,19 @@ function loginPage(next) {
     try {
       if (real) {
         const s = await getSdk();
-        const e = mode === "up" ? await s.signUp(email, pw) : await s.signIn(email, pw);
-        await finish(e || email, name, next);
+        if (mode === "up") {
+          const result = await s.signUp(email, pw);
+          if (result && typeof result === "object" && result.needsConfirmation) {
+            err("تم إنشاء الحساب. افتح رسالة التأكيد التي وصلتك على البريد، وبعد تأكيده ارجع وسجّل الدخول.");
+            btn.disabled = false; btn.textContent = "إنشاء الحساب";
+            return;
+          }
+          const signedEmail = typeof result === "string" ? result : (result?.email || email);
+          await finish(signedEmail, name, next);
+        } else {
+          const signedEmail = await s.signIn(email, pw);
+          await finish(signedEmail || email, name, next);
+        }
       } else {
         const users = ls.get("vx-users", {});
         if (mode === "up") {
@@ -179,7 +190,19 @@ function loginPage(next) {
         nouser: ((document.getElementById("ae")||{}).value||"").trim().toLowerCase() === String((window.AUTH_CONFIG||{}).ownerEmail||"").toLowerCase() ? "ده بريد لوحة الإدارة، مش حساب قارئ. افتح ملف admin.html وهناك تختار كلمة مرور أول مرة. وهنا اعمل حساب قارئ عادي ببريد وكلمة مرور من اختيارك." : "مفيش حساب بالبريد ده. اعمل حساب جديد.",
         bad: "كلمة المرور غلط."
       }[x.message];
-      if (!msg && lower.includes("invalid login credentials")) msg = "البريد أو كلمة المرور غير صحيحة. تأكد من بيانات الحساب، أو استخدم نسيت كلمة المرور.";
+      if (!msg && lower.includes("invalid login credentials")) {
+        if (email === String(CFG.ownerEmail || "").trim().toLowerCase()) {
+          mode = "up";
+          loginPage(next);
+          $("#ae").value = email;
+          $("#ap").value = pw;
+          const e = $("#ae-err");
+          e.textContent = "بريد الإدارة ده لسه ملوش حساب في Supabase. اضغط «إنشاء الحساب» بنفس البريد، وبعدها أكّد رسالة البريد لو وصلتك.";
+          e.hidden = false;
+          return;
+        }
+        msg = "البريد أو كلمة المرور غير صحيحة. تأكد من بيانات الحساب، أو استخدم نسيت كلمة المرور.";
+      }
       if (!msg && lower.includes("email not confirmed")) msg = "لازم تأكد بريدك الإلكتروني من رسالة Supabase قبل تسجيل الدخول.";
       if (!msg && (lower.includes("user already registered") || lower.includes("already registered"))) msg = "البريد مسجل بالفعل. ارجع لتبويب دخول بدل إنشاء حساب جديد.";
       if (!msg && (lower.includes("password") && (lower.includes("at least") || lower.includes("characters")))) msg = "كلمة المرور لا تحقق شروط الأمان المطلوبة.";
