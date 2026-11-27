@@ -174,8 +174,8 @@ async function sourcesView() {
     const authLabel = { pending: "بانتظار الموافقة", authorized: "مصرح", restricted: "موقوف" };
     const jobLabel = { queued: "في الانتظار", running: "قيد التنفيذ", downloading: "جارٍ التنزيل", ocr: "استخراج النص", cleaning: "تنظيف الصور", translating: "الترجمة", typesetting: "تركيب النص", ready: "جاهز", published: "منشور", completed: "مكتمل", failed: "فشل", needs_attention: "يحتاج تدخل", cancelled: "ملغي" };
     host.innerHTML = `
-      <div class="panel"><h2>مصادر المحتوى</h2>
-        <p style="color:var(--mut);line-height:1.9">المصدر لا يعمل إلا بعد تغيير حالته إلى «مصرح» ثم تفعيله. Asura مضاف كإعداد فقط، ولا يتم الاتصال به أو استيراد محتواه قبل توفر الموافقة.</p>
+      <div class="panel"><div class="top"><h2>مصادر المحتوى</h2><button class="btn pri" id="addSource">+ إضافة مصدر</button></div>
+        <p style="color:var(--mut);line-height:1.9">المصدر لا يعمل إلا بعد تغيير حالته إلى «مصرح» ثم إضافة عنوانه وتفعيله. Asura مضاف كإعداد فقط، ولا يتم الاتصال به أو استيراد محتواه قبل توفر الموافقة.</p>
         <div class="tw"><table><thead><tr><th>المصدر</th><th>عنوان المصدر</th><th>المعالج</th><th>حالة الإذن</th><th>التفعيل</th><th>الفحص كل</th></tr></thead><tbody>
         ${(sources || []).map((source) => `<tr>
           <td><b>${esc(source.display_name)}</b><br><small dir="ltr">${esc(source.source_key)}</small></td>
@@ -197,6 +197,24 @@ async function sourcesView() {
         ${(processing || []).map((job) => `<tr><td dir="ltr">${esc(String(job.chapter_id).slice(0, 8))}</td><td>${esc(jobLabel[job.status] || job.status)}</td><td>${Number(job.completed_pages)} / ${Number(job.total_pages)}</td><td>${esc(job.last_error || "—")}</td><td>${job.updated_at ? esc(new Date(job.updated_at).toLocaleString("ar-EG")) : "—"}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد مهام معالجة حتى الآن. عامل OCR والترجمة لم يتم تشغيله بعد.</td></tr>'}
         </tbody></table></div>
       </div>`;
+    $("#addSource").onclick = () => {
+      modal("<h2>إضافة مصدر محتوى</h2><form id=\"source-form\"><label for=\"source-name\">اسم المصدر</label><input id=\"source-name\" required maxlength=\"80\" placeholder=\"اسم الموقع\"><label for=\"source-key\">المعرّف التقني (إنجليزي)</label><input id=\"source-key\" required maxlength=\"50\" placeholder=\"source_name\" dir=\"ltr\"><label for=\"source-adapter\">اسم المعالج</label><input id=\"source-adapter\" required maxlength=\"50\" dir=\"ltr\"><label for=\"source-url\">رابط الموقع (اختياري)</label><input id=\"source-url\" type=\"url\" placeholder=\"https://...\" dir=\"ltr\"><div class=\"err\" id=\"source-error\" role=\"alert\"></div><div class=\"acts\"><button class=\"btn pri\">إضافة مع إيقاف المصدر</button><button type=\"button\" class=\"btn\" id=\"source-cancel\">إلغاء</button></div></form>");
+      $("#source-cancel").onclick = closeModal;
+      $("#source-form").onsubmit = async (event) => {
+        event.preventDefault();
+        const name = $("#source-name").value.trim();
+        const key = $("#source-key").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+        const adapter = $("#source-adapter").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+        const url = $("#source-url").value.trim();
+        if (!name || !key || !adapter) { $("#source-error").textContent = "أكمل البيانات المطلوبة."; return; }
+        if (url && !/^https:\/\//i.test(url)) { $("#source-error").textContent = "الرابط لازم يبدأ بـ https://"; return; }
+        try {
+          const { error } = await db.from("site_content_sources").insert({ source_key: key, display_name: name, adapter_key: adapter, base_url: url || null, enabled: false, authorization_status: "pending" });
+          if (error) throw error;
+          closeModal(); toast("تمت إضافة المصدر وهو متوقف افتراضيًا"); sourcesView();
+        } catch (error) { $("#source-error").textContent = error?.message || "تعذر إضافة المصدر."; }
+      };
+    };
     host.onchange = async (event) => {
       const auth = event.target.closest("[data-source-auth]");
       const enabled = event.target.closest("[data-source-enabled]");
