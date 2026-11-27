@@ -260,14 +260,20 @@ function dash() {
 
 /* ---- الأعمال ---- */
 function worksView() {
+  if (realProvider() === "supabase" && !worksLoadedFromDb) {
+    $("#v").innerHTML = `<div class="panel"><h2>إدارة الأعمال</h2><p class="empty">${esc(worksLoadError || "جارٍ تحميل الأعمال من قاعدة البيانات...")}</p><button class="btn" id="reloadWorks">إعادة المحاولة</button></div>`;
+    $("#reloadWorks").onclick = async () => { try { await loadWorksFromDatabase(); worksView(); } catch (error) { worksLoadError = error.message; worksView(); } };
+    return;
+  }
   $("#v").innerHTML = `<div class="top" style="margin-top:-6px"><input id="sq" placeholder="ابحث..." style="max-width:260px"><button class="btn pri" id="add">+ إضافة عمل</button></div>
-  <div class="panel"><div class="tw"><table><thead><tr><th></th><th>العنوان</th><th>النوع</th><th>الحالة</th><th>الفصول</th><th>التقييم</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
+  <div class="panel"><div class="tw"><table><thead><tr><th></th><th>العنوان</th><th>النوع</th><th>الحالة</th><th>الفصول</th><th>التقييم</th><th>النشر</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
   const draw = () => {
     const q = $("#sq").value.trim().toLowerCase();
     const list = works.map((w, i) => ({ w, i })).filter(({ w }) => w.title.toLowerCase().includes(q));
     $("#tb").innerHTML = list.map(({ w, i }) => `<tr><td>${w.cover ? `<img class="thumb" src="${esc(w.cover)}" alt="" loading="lazy">` : `<div class="thumb" style="background:linear-gradient(135deg,#7c5cff,#ff5c9a)"></div>`}</td>
       <td dir="auto"><b>${esc(w.title)}</b></td><td><span class="pill">${w.type === "manga" ? "مانجا" : "مانهوا"}</span></td><td>${esc(w.status)}</td><td>${esc(w.chapters)}</td><td>${esc(w.rating)}</td>
-      <td style="white-space:nowrap"><button class="btn sm" data-e="${i}">تعديل</button> <button class="btn sm dan" data-d="${i}">حذف</button></td></tr>`).join("") || `<tr><td colspan="7" class="empty">لا توجد نتائج</td></tr>`;
+      <td><span class="pill">${w.is_published === false ? "مخفي" : "منشور"}</span></td>
+      <td style="white-space:nowrap"><button class="btn sm" data-e="${i}">تعديل</button> <button class="btn sm ${w.is_published === false ? "pri" : "dan"}" data-d="${i}">${w.is_published === false ? "نشر" : "إخفاء"}</button></td></tr>`).join("") || `<tr><td colspan="8" class="empty">لا توجد نتائج</td></tr>`;
     document.querySelectorAll("[data-e]").forEach((b) => (b.onclick = () => workForm(+b.dataset.e)));
     document.querySelectorAll("[data-d]").forEach((b) => (b.onclick = () => confirmDel(+b.dataset.d)));
   };
@@ -276,17 +282,34 @@ function worksView() {
 function modal(html) { document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="md" role="dialog" aria-modal="true"><div class="box">${html}</div></div>`); $("#md").onclick = (e) => { if (e.target.id === "md") closeModal(); }; }
 const closeModal = () => $("#md")?.remove();
 function confirmDel(i) {
-  modal(`<h2>حذف العمل؟</h2><p style="color:var(--mut)">سيتم حذف «${esc(works[i].title)}» من هذا المتصفح. لا يمكن التراجع.</p><div class="acts"><button class="btn dan" id="yes">حذف</button><button class="btn" id="no">إلغاء</button></div>`);
-  $("#no").onclick = closeModal; $("#yes").onclick = () => { works.splice(i, 1); persist(); closeModal(); toast("تم الحذف"); render(); };
+  const item = works[i];
+  const publish = item.is_published === false;
+  const action = publish ? "إعادة نشر" : "إخفاء";
+  modal(`<h2>${action} العمل؟</h2><p style="color:var(--mut)">${publish ? "سيعود العمل للظهور للقراء." : "سيختفي العمل من الموقع مع الاحتفاظ بالفصول والبيانات."}</p><div class="acts"><button class="btn ${publish ? "pri" : "dan"}" id="yes">${action}</button><button class="btn" id="no">إلغاء</button></div>`);
+  $("#no").onclick = closeModal;
+  $("#yes").onclick = async () => {
+    try {
+      if (realProvider() === "supabase") {
+        const db = window.GALAXITE_SUPABASE_CLIENT;
+        const { error } = await db.from("site_works").update({ is_published: publish }).eq("id", item.id);
+        if (error) throw error;
+        await loadWorksFromDatabase();
+      } else {
+        item.is_published = publish; persist();
+      }
+      closeModal(); toast(publish ? "تم نشر العمل" : "تم إخفاء العمل"); render();
+    } catch (error) { toast(error?.message || "تعذر تحديث العمل"); }
+  };
 }
 function workForm(i) {
-  const w = i === undefined ? { title: "", type: "manga", genres: [], rating: 8, status: "مستمر", desc: "", cover: "", chapters: 1 } : works[i];
+  if (realProvider() === "supabase" && !worksLoadedFromDb) { toast("بيانات الأعمال غير جاهزة"); return; }
+  const w = i === undefined ? { id: null, title: "", type: "manga", genres: [], rating: 8, status: "مستمر", desc: "", cover: "", chapters: 0, is_published: true, sort_order: 0 } : works[i];
   modal(`<h2>${i === undefined ? "إضافة عمل" : "تعديل العمل"}</h2><form id="wf">
     <label for="t">العنوان</label><input id="t" required value="${esc(w.title)}">
     <div class="row2"><div><label for="ty">النوع</label><select id="ty"><option value="manga" ${w.type === "manga" ? "selected" : ""}>مانجا</option><option value="manhwa" ${w.type === "manhwa" ? "selected" : ""}>مانهوا</option></select></div>
     <div><label for="st">الحالة</label><select id="st">${["مستمر", "مكتمل", "متوقف"].map((s) => `<option ${w.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div></div>
     <div class="row2"><div><label for="ra">التقييم (0-10)</label><input id="ra" type="number" min="0" max="10" step="0.1" value="${esc(w.rating)}"></div>
-    <div><label for="ch">عدد الفصول</label><input id="ch" type="number" min="1" value="${esc(w.chapters)}"></div></div>
+    <div><label for="ch">عدد الفصول</label><input id="ch" type="number" min="0" value="${esc(w.chapters)}"></div></div>
     <label for="g">التصنيفات (مفصولة بفاصلة)</label><input id="g" list="gl" value="${esc((w.genres || []).join("، "))}"><datalist id="gl">${[...new Set(works.flatMap((x) => x.genres || []))].map((g) => `<option value="${esc(g)}"></option>`).join("")}</datalist><div class="gchips" id="gch">${[...new Set(works.flatMap((x) => x.genres || []))].map((g) => `<button type="button" class="btn sm" data-gc="${esc(g)}">+ ${esc(g)}</button>`).join(" ")}</div>
     <label for="d">الوصف</label><textarea id="d" rows="3">${esc(w.desc)}</textarea>
     <label for="c">رابط صورة الغلاف (https)</label><input id="c" type="url" placeholder="https://..." value="${esc(w.cover)}">
@@ -296,16 +319,32 @@ function workForm(i) {
   const prev = () => { const v = $("#c").value.trim(); $("#cp").innerHTML = /^https?:\/\//i.test(v) ? `<img class="thumb" style="width:70px;height:100px" src="${esc(v)}" alt="معاينة الغلاف" onerror="this.replaceWith(Object.assign(document.createElement('small'),{textContent:'تعذر تحميل الصورة'}))">` : ""; };
   document.querySelectorAll("[data-gc]").forEach((b) => (b.onclick = () => { const cur = $("#g").value.split(/[،,]/).map((s) => s.trim()).filter(Boolean); if (!cur.includes(b.dataset.gc)) cur.push(b.dataset.gc); $("#g").value = cur.join("، "); }));
   $("#c").oninput = prev; prev(); $("#cx").onclick = closeModal;
-  $("#wf").onsubmit = (e) => {
+  $("#wf").onsubmit = async (e) => {
     e.preventDefault();
     const title = $("#t").value.trim(), cover = $("#c").value.trim();
     if (!title) return;
     if (cover && !/^https?:\/\//i.test(cover)) { $("#fe").textContent = "رابط الغلاف لازم يبدأ بـ https://"; return; }
     if (works.some((x, k) => k !== i && x.title.toLowerCase() === title.toLowerCase())) { $("#fe").textContent = "فيه عمل بنفس العنوان."; return; }
-    const n = { ...w, title, type: $("#ty").value, status: $("#st").value, rating: +$("#ra").value || 0, chapters: Math.max(1, +$("#ch").value || 1), genres: $("#g").value.split(/[،,]/).map((s) => s.trim()).filter(Boolean), desc: $("#d").value.trim(), cover };
-    if (!n.cover) delete n.cover;
-    if (i === undefined) works.unshift(n); else works[i] = n;
-    persist(); closeModal(); toast("تم الحفظ"); render();
+    const n = { ...w, title, type: $("#ty").value, status: $("#st").value, rating: +$("#ra").value || 0, chapters: Math.max(0, +$("#ch").value || 0), genres: $("#g").value.split(/[،,]/).map((s) => s.trim()).filter(Boolean), desc: $("#d").value.trim(), cover };
+    try {
+      if (realProvider() === "supabase") {
+        const db = window.GALAXITE_SUPABASE_CLIENT;
+        const payload = {
+          id: n.id || workIdFromTitle(title), title: n.title, type: n.type, genres: n.genres,
+          rating: n.rating, status: n.status, description: n.desc, chapter_count: n.chapters,
+          cover_url: n.cover || null, is_published: n.is_published !== false,
+          sort_order: Number.isInteger(n.sort_order) ? n.sort_order : (i === undefined ? 0 : i)
+        };
+        const { error } = await db.from("site_works").upsert(payload, { onConflict: "id" });
+        if (error) throw error;
+        await loadWorksFromDatabase();
+      } else {
+        if (!n.cover) delete n.cover;
+        if (i === undefined) works.unshift(n); else works[i] = n;
+        persist();
+      }
+      closeModal(); toast("تم حفظ العمل في قاعدة البيانات"); render();
+    } catch (error) { $("#fe").textContent = error?.message || "تعذر حفظ العمل."; }
   };
 }
 
