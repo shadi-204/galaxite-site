@@ -73,8 +73,8 @@ pre.code{background:#0b0d14;border:1px solid var(--line);border-radius:12px;padd
 
 /* Password visibility control for the admin sign-in form. */
 .admin-pw{position:relative;display:block;width:100%}
-.admin-pw input{padding-inline-end:48px}
-.admin-pw-toggle{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:transparent;color:var(--mut);cursor:pointer}
+.admin-pw input{padding-left:48px;padding-inline-start:initial}
+.admin-pw-toggle{position:absolute;left:8px;right:auto;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:transparent;color:var(--mut);cursor:pointer}
 .admin-pw-toggle:hover{color:#fff;background:#ffffff12}
 .admin-pw-toggle .eye-closed{display:none}
 .admin-pw-toggle[aria-pressed="true"] .eye-open{display:none}
