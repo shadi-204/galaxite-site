@@ -172,7 +172,19 @@ function loginPage(next) {
         }
       }
     } catch (x) {
-      const msg = { exists: "البريد ده مسجل قبل كده. جرّب تسجل دخول.", nouser: ((document.getElementById("ae")||{}).value||"").trim().toLowerCase() === String((window.AUTH_CONFIG||{}).ownerEmail||"").toLowerCase() ? "ده بريد لوحة الإدارة، مش حساب قارئ. افتح ملف admin.html وهناك تختار كلمة مرور أول مرة. وهنا اعمل حساب قارئ عادي ببريد وكلمة مرور من اختيارك." : "مفيش حساب بالبريد ده. اعمل حساب جديد.", bad: "كلمة المرور غلط." }[x.message] || "ما قدرناش نكمل العملية. راجع البيانات أو إعدادات الربط.";
+      const raw = String(x?.message || "");
+      const lower = raw.toLowerCase();
+      let msg = {
+        exists: "البريد ده مسجل قبل كده. جرّب تسجل دخول.",
+        nouser: ((document.getElementById("ae")||{}).value||"").trim().toLowerCase() === String((window.AUTH_CONFIG||{}).ownerEmail||"").toLowerCase() ? "ده بريد لوحة الإدارة، مش حساب قارئ. افتح ملف admin.html وهناك تختار كلمة مرور أول مرة. وهنا اعمل حساب قارئ عادي ببريد وكلمة مرور من اختيارك." : "مفيش حساب بالبريد ده. اعمل حساب جديد.",
+        bad: "كلمة المرور غلط."
+      }[x.message];
+      if (!msg && lower.includes("invalid login credentials")) msg = "البريد أو كلمة المرور غير صحيحة. تأكد من بيانات الحساب، أو استخدم نسيت كلمة المرور.";
+      if (!msg && lower.includes("email not confirmed")) msg = "لازم تأكد بريدك الإلكتروني من رسالة Supabase قبل تسجيل الدخول.";
+      if (!msg && (lower.includes("user already registered") || lower.includes("already registered"))) msg = "البريد مسجل بالفعل. ارجع لتبويب دخول بدل إنشاء حساب جديد.";
+      if (!msg && (lower.includes("password") && (lower.includes("at least") || lower.includes("characters")))) msg = "كلمة المرور لا تحقق شروط الأمان المطلوبة.";
+      if (!msg && (lower.includes("fetch") || lower.includes("network"))) msg = "تعذر الاتصال بخدمة تسجيل الدخول. جرّب تاني وتأكد من اتصال الإنترنت.";
+      if (!msg) msg = raw ? "Supabase رفض تسجيل الدخول: " + raw : "ما قدرناش نكمل العملية. راجع البيانات أو إعدادات الربط.";
       err(msg); btn.disabled = false; btn.textContent = mode === "in" ? "دخول" : "إنشاء الحساب";
     }
   };
