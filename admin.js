@@ -350,31 +350,139 @@ function workForm(i) {
 
 /* ---- الفصول ---- */
 let selWork = 0;
-function chaptersView() {
+async function chaptersView() {
+  if (realProvider() === "supabase" && !worksLoadedFromDb) {
+    $("#v").innerHTML = '<div class="panel"><h2>إدارة الفصول</h2><p class="empty">بيانات الأعمال غير جاهزة.</p></div>';
+    return;
+  }
   if (!works.length) { $("#v").innerHTML = `<div class="panel empty">أضف عملا أولا.</div>`; return; }
   selWork = Math.min(selWork, works.length - 1);
-  const w = works[selWork];
-  $("#v").innerHTML = `<div class="panel"><label for="sw" style="margin-top:0">اختر العمل</label><select id="sw">${works.map((x, i) => `<option value="${i}" ${i === selWork ? "selected" : ""}>${esc(x.title)}</option>`).join("")}</select>
-    <div class="row2"><div><label for="cn">رقم الفصل</label><input id="cn" type="number" min="1" max="${w.chapters}" value="${w.chapters}"></div>
-    <div><label>&nbsp;</label><button class="btn" id="ac" style="width:100%;justify-content:center">+ إضافة فصل جديد (${+w.chapters + 1})</button></div></div>
-    <label for="pg">روابط صور الفصل (رابط في كل سطر)</label><textarea id="pg" rows="6" dir="ltr" placeholder="https://..."></textarea>
-    <div class="err" id="ce" role="alert"></div>
-    <div class="acts"><button class="btn pri" id="sp">حفظ صور الفصل</button><button class="btn dan" id="cp2">مسح صور الفصل</button></div>
-    <p style="color:var(--mut);font-size:13px">استخدم صور عندك حق نشرها فقط. بدون صور يعرض الموقع صفحات بديلة.</p></div>
-    <div class="panel"><h2>فصول لها صور (${Object.keys(w.pages || {}).length})</h2><div class="tw"><table><tbody>${Object.entries(w.pages || {}).sort((a, b) => b[0] - a[0]).map(([n, p]) => `<tr><td>الفصل ${esc(n)}</td><td>${p.length} صورة</td><td><button class="btn sm" data-l="${esc(n)}">تحميل للتعديل</button></td></tr>`).join("") || `<tr><td class="empty">لا توجد</td></tr>`}</tbody></table></div></div>`;
-  const loadCh = () => { const n = $("#cn").value; $("#pg").value = ((w.pages || {})[n] || []).join("\n"); };
-  $("#sw").onchange = () => { selWork = +$("#sw").value; chaptersView(); };
-  $("#cn").oninput = loadCh; loadCh();
-  $("#ac").onclick = () => { w.chapters = +w.chapters + 1; persist(); toast("تمت إضافة فصل"); chaptersView(); };
-  $("#sp").onclick = () => {
-    const n = +$("#cn").value, lines = $("#pg").value.split("\n").map((s) => s.trim()).filter(Boolean);
-    if (!(n >= 1 && n <= w.chapters)) { $("#ce").textContent = "رقم الفصل خارج النطاق."; return; }
-    if (lines.some((u) => !/^https?:\/\//i.test(u))) { $("#ce").textContent = "كل رابط لازم يبدأ بـ https://"; return; }
-    w.pages = w.pages || {}; if (lines.length) w.pages[n] = lines; else delete w.pages[n];
-    persist(); toast("تم الحفظ"); chaptersView();
-  };
-  $("#cp2").onclick = () => { delete (w.pages || {})[+$("#cn").value]; persist(); toast("تم المسح"); chaptersView(); };
-  document.querySelectorAll("[data-l]").forEach((b) => (b.onclick = () => { $("#cn").value = b.dataset.l; loadCh(); }));
+  const w = works[selWork], db = window.GALAXITE_SUPABASE_CLIENT;
+  if (!db) { $("#v").innerHTML = '<div class="panel empty">إدارة الفصول تحتاج اتصال Supabase.</div>'; return; }
+  $("#v").innerHTML = '<div class="panel"><p class="empty">جارٍ تحميل الفصول...</p></div>';
+  try {
+    const { data: chapters, error } = await db.from("site_chapters")
+      .select("id,chapter_number,title,is_published,is_premium,created_at")
+      .eq("work_id", w.id).order("chapter_number", { ascending: false }).limit(500);
+    if (error) throw error;
+    const ids = (chapters || []).map((x) => x.id);
+    let pageCounts = {};
+    if (ids.length) {
+      const { data: pages, error: pageError } = await db.from("site_chapter_pages")
+        .select("chapter_id,page_number").in("chapter_id", ids);
+      if (pageError) throw pageError;
+      for (const page of pages || []) pageCounts[page.chapter_id] = (pageCounts[page.chapter_id] || 0) + 1;
+    }
+    $("#v").innerHTML = `
+      <div class="panel">
+        <label for="sw" style="margin-top:0">اختر العمل</label>
+        <select id="sw">${works.map((x, i) => `<option value="${i}" ${i === selWork ? "selected" : ""}>${esc(x.title)}</option>`).join("")}</select>
+        <h3 style="margin:18px 0 8px">إضافة / تعديل فصل</h3>
+        <input id="chapter-id" type="hidden">
+        <div class="row2"><div><label for="cn">رقم الفصل</label><input id="cn" type="number" min="1" step="1" value="${Math.max(1, w.chapters + 1)}"></div>
+        <div><label for="ct">عنوان الفصل (اختياري)</label><input id="ct" placeholder="الفصل 201"></div></div>
+        <div class="row2">
+          <label class="sw"><input id="pub" type="checkbox"> نشر الفصل</label>
+          <label class="sw"><input id="prem" type="checkbox"> فصل مدفوع</label>
+        </div>
+        <label for="chapter-files">صور الفصل بالترتيب (يمكن اختيار أكثر من صورة)</label>
+        <input id="chapter-files" type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif">
+        <label class="sw" style="margin-top:10px"><input id="replace-pages" type="checkbox"> استبدال الصور القديمة بدل إضافة صور جديدة</label>
+        <p style="color:var(--mut);font-size:12px;margin:8px 0">الصور تُرفع إلى التخزين الخاص في Galaxite. الحد الأقصى للصورة الواحدة 15MB. لا ترفع إلا صفحات تملك حق استخدامها.</p>
+        <div class="err" id="ce" role="alert"></div>
+        <div class="acts"><button class="btn pri" id="saveChapter">حفظ الفصل والصور</button><button class="btn" id="clearChapter">تفريغ النموذج</button></div>
+      </div>
+      <div class="panel"><h3>فصول ${esc(w.title)} <small style="color:var(--mut)">آخر 500 فصل</small></h3>
+        <div class="tw"><table><thead><tr><th>الفصل</th><th>الحالة</th><th>الصفحات</th><th>النوع</th><th></th></tr></thead><tbody>
+        ${(chapters || []).map((x) => `<tr><td>${esc(x.chapter_number)} · ${esc(x.title || "")}</td><td><span class="pill">${x.is_published ? "منشور" : "مسودة"}</span></td><td>${pageCounts[x.id] || 0}</td><td>${x.is_premium ? "مدفوع" : "مجاني"}</td><td><button class="btn sm" data-edit-chapter="${esc(x.id)}">تعديل</button></td></tr>`).join("") || '<tr><td colspan="5" class="empty">لا توجد فصول مسجلة.</td></tr>'}
+        </tbody></table></div>
+      </div>`;
+    $("#sw").onchange = () => { selWork = +$("#sw").value; chaptersView(); };
+    const clearForm = () => { $("#chapter-id").value = ""; $("#cn").value = Math.max(1, w.chapters + 1); $("#ct").value = ""; $("#pub").checked = false; $("#prem").checked = false; $("#chapter-files").value = ""; $("#replace-pages").checked = false; $("#ce").textContent = ""; };
+    $("#clearChapter").onclick = clearForm;
+    document.querySelectorAll("[data-edit-chapter]").forEach((button) => {
+      button.onclick = () => {
+        const chapter = chapters.find((x) => x.id === button.dataset.editChapter);
+        if (!chapter) return;
+        $("#chapter-id").value = chapter.id;
+        $("#cn").value = chapter.chapter_number;
+        $("#ct").value = chapter.title || "";
+        $("#pub").checked = !!chapter.is_published;
+        $("#prem").checked = !!chapter.is_premium;
+        $("#chapter-files").value = "";
+        $("#replace-pages").checked = false;
+        $("#ce").textContent = "";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+    });
+    $("#saveChapter").onclick = async () => {
+      const number = Number($("#cn").value);
+      const title = $("#ct").value.trim();
+      const files = Array.from($("#chapter-files").files || []);
+      const replacePages = $("#replace-pages").checked;
+      const err = $("#ce"), save = $("#saveChapter");
+      err.textContent = "";
+      if (!Number.isInteger(number) || number < 1) { err.textContent = "رقم الفصل لازم يكون رقمًا صحيحًا أكبر من صفر."; return; }
+      if (files.some((file) => !["image/jpeg","image/png","image/webp","image/avif"].includes(file.type) || file.size > 15 * 1024 * 1024)) {
+        err.textContent = "استخدم صور JPG أو PNG أو WEBP أو AVIF، وبحد أقصى 15MB للصورة."; return;
+      }
+      save.disabled = true; save.textContent = "جارٍ الحفظ...";
+      let uploaded = [], oldPages = [], chapterId = "";
+      try {
+        const { data: savedChapter, error: chapterError } = await db.from("site_chapters").upsert({
+          work_id: w.id, chapter_number: number, title: title || null,
+          is_published: $("#pub").checked, is_premium: $("#prem").checked
+        }, { onConflict: "work_id,chapter_number" }).select("id").single();
+        if (chapterError) throw chapterError;
+        chapterId = savedChapter.id;
+        if (files.length) {
+          const { data: old, error: oldError } = await db.from("site_chapter_pages")
+            .select("id,page_number,storage_path").eq("chapter_id", chapterId).order("page_number");
+          if (oldError) throw oldError;
+          oldPages = old || [];
+          const startAt = replacePages ? 0 : oldPages.length;
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "page";
+            const storagePath = `${w.id}/${number}/${Date.now()}-${i}-${safeName}`;
+            const { error: uploadError } = await db.storage.from("galaxite-chapters")
+              .upload(storagePath, file, { contentType: file.type, upsert: false });
+            if (uploadError) throw uploadError;
+            uploaded.push({ page_number: startAt + i + 1, storage_path: storagePath });
+          }
+          if (replacePages && oldPages.length) {
+            const { error: deleteError } = await db.from("site_chapter_pages").delete().eq("chapter_id", chapterId);
+            if (deleteError) throw deleteError;
+          }
+          const { error: insertError } = await db.from("site_chapter_pages").insert(
+            uploaded.map((page) => ({ chapter_id: chapterId, page_number: page.page_number, storage_path: page.storage_path }))
+          );
+          if (insertError) {
+            if (replacePages && oldPages.length) await db.from("site_chapter_pages").insert(oldPages);
+            throw insertError;
+          }
+          if (replacePages && oldPages.length) {
+            await db.storage.from("galaxite-chapters").remove(oldPages.map((page) => page.storage_path));
+          }
+        }
+        if (number > w.chapters) {
+          const { error: countError } = await db.from("site_works").update({ chapter_count: number }).eq("id", w.id);
+          if (countError) throw countError;
+        }
+        await loadWorksFromDatabase();
+        toast(files.length ? "تم حفظ الفصل ورفع الصور" : "تم حفظ بيانات الفصل");
+        chaptersView();
+      } catch (error) {
+        if (uploaded.length) await db.storage.from("galaxite-chapters").remove(uploaded.map((page) => page.storage_path));
+        err.textContent = error?.message || "تعذر حفظ الفصل. لم يتم اعتماد العملية.";
+      } finally {
+        save.disabled = false; save.textContent = "حفظ الفصل والصور";
+      }
+    };
+  } catch (error) {
+    $("#v").innerHTML = `<div class="panel"><h2>تعذر تحميل الفصول</h2><p class="empty">${esc(error?.message || "تحقق من صلاحيات الحساب.")}</p><button class="btn" id="retryChapters">إعادة المحاولة</button></div>`;
+    $("#retryChapters").onclick = chaptersView;
+  }
 }
 
 /* ---- الإعدادات ---- */
