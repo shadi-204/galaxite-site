@@ -70,3 +70,12 @@ pre.code{background:#0b0d14;border:1px solid var(--line);border-radius:12px;padd
 .warn{background:#f59e0b14;border:1px solid #f59e0b40;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:14px;line-height:1.7}
 .side a.on{background:linear-gradient(90deg,#dc262644,#dc262618)}.btn.pri{background:linear-gradient(90deg,#dc2626,#ef4444)}
 .side{overflow:auto}
+
+/* Password visibility control for the admin sign-in form. */
+.admin-pw{position:relative;display:block;width:100%}
+.admin-pw input{padding-inline-end:48px}
+.admin-pw-toggle{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:transparent;color:var(--mut);cursor:pointer}
+.admin-pw-toggle:hover{color:#fff;background:#ffffff12}
+.admin-pw-toggle .eye-closed{display:none}
+.admin-pw-toggle[aria-pressed="true"] .eye-open{display:none}
+.admin-pw-toggle[aria-pressed="true"] .eye-closed{display:block}
