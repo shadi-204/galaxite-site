@@ -36,6 +36,7 @@
 - Supabase Security Advisor reports that leaked-password protection is disabled. Enable it in Supabase Auth password-security settings before public launch.
 - Advisor warnings also include anonymous/public policy exposure and multiple permissive policies. These need table-by-table validation; the public catalog and reader paths intentionally have public reads.
 - Performance Advisor reports unindexed foreign keys and unused indexes across legacy and current tables. No bulk index removal was performed because workload evidence is needed first.
+- The foreign-key columns on the current Galaxite site tables were checked individually; each has a usable leading index, so no duplicate index migration was added.
 - Database migration `20261128001346_remove_placeholder_owner_email_promotion` was applied and verified: the placeholder email promotion triggers/function are absent, and one confirmed Owner account remains.
 
 ## Remaining blockers before launch
