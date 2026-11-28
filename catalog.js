@@ -110,7 +110,7 @@
     const rows = [];
     while (true) {
       const result = await db.from("site_chapters")
-        .select("id,work_id,chapter_number,title,is_premium,created_at")
+        .select("id,work_id,chapter_number,title,display_title,source_published_at,is_premium,created_at")
         .eq("work_id", String(workId))
         .eq("is_published", true)
         .order("chapter_number", { ascending: false })
@@ -121,6 +121,8 @@
         id: chapter.id,
         chapter_number: Number(chapter.chapter_number),
         title: chapter.title || "",
+        display_title: chapter.display_title || null,
+        source_published_at: chapter.source_published_at || null,
         is_premium: Boolean(chapter.is_premium),
         created_at: chapter.created_at || null
       })));
@@ -221,7 +223,7 @@
       const db = await getClient();
       if (!db) return [];
       const { data, error } = await db.from("site_chapters")
-        .select("work_id,chapter_number,title,created_at")
+        .select("work_id,chapter_number,title,display_title,source_published_at,created_at")
         .eq("is_published", true)
         .order("created_at", { ascending: false })
         .limit(limit);
