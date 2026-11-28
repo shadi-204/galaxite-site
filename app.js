@@ -13,6 +13,11 @@ const norm = (s) => String(s).toLowerCase().replace(/[\u064B-\u0652\u0640]/g, ""
 const hit = (w, q) => !q || (!norm(q) ? [w.title, w.desc || ""].some((f) => String(f).toLowerCase().includes(q.toLowerCase())) : [w.title, ...(w.genres || []), w.desc || ""].some((f) => norm(f).includes(norm(q))));
 const byTitle = (t) => WORKS.find((w) => w.title === t);
 const slug = (w) => encodeURIComponent(w.title);
+const chapterDisplayTitle = (chapter, number) => {
+  const raw = String(chapter.display_title || chapter.title || ("الفصل " + number));
+  const clean = raw.replace(/\\s+(?:just now|yesterday|last week|last month|last year|(?:\\d+|a|an|one)\\s+(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\\s+ago|[A-Za-z]{3,9}\\s+\\d{1,2},\\s+\\d{4})$/i, "").trim();
+  return clean || ("الفصل " + number);
+};
 const chaptersFor = (w) => {
   if (Array.isArray(w.publishedChapters)) {
     return w.publishedChapters
@@ -105,8 +110,13 @@ function series(w) {
     const premium = VX.premium(w, number), locked = premium && VX.locked(w, number);
     const latest = chapters[0]?.number;
     const isRead = (prog[w.title] || 0) >= number;
-    const publishedDate = chapter.created_at && !Number.isNaN(Date.parse(chapter.created_at))
-      ? new Date(chapter.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short", year: "numeric" })
+    const publishedDate = chapter.source_published_at && !Number.isNaN(Date.parse(chapter.source_published_at))
+      ? new Intl.DateTimeFormat("ar-EG", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "Africa/Cairo"
+        }).format(new Date(chapter.source_published_at))
       : "";
     const chapterMeta = [
       number === latest ? '<em class="new">● جديد</em>' : "",
@@ -117,7 +127,7 @@ function series(w) {
     return `<div class="chr ${locked ? "lk" : ""} ${isRead ? "rd" : ""}">
       <a class="chapter-main" href="#/r/${slug(w)}/${number}">
         <span class="thm" style="background:${grad(w.title + number, number)}">${w.cover ? `<img class="chapter-thumb" src="${esc(w.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : locked ? "🔒" : "›"}</span>
-        <span class="cn"><b>${esc(chapter.title || ("الفصل " + number))}</b><small class="chapter-meta">${chapterMeta}</small></span>
+        <span class="cn"><b>${esc(chapterDisplayTitle(chapter, number))}</b><small class="chapter-meta">${chapterMeta}</small></span>
       </a>
       ${locked ? `<span class="price">${VX.coin}<b>${VX.LOCK_COST}</b></span>` : `<span class="chapter-end">${premium ? `<span class="price ok">مفتوح</span>` : ""}<button class="chapter-heart" type="button" data-chapter-id="${esc(chapter.id || "")}" aria-label="أعجبني الفصل ${number}" aria-pressed="false"><span class="chapter-heart-icon" aria-hidden="true">♡</span><b class="chapter-heart-count">…</b></button></span>`}
     </div>`;
