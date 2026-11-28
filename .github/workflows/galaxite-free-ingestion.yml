@@ -1,0 +1,14 @@
+name: Galaxite free ingestion dispatcher
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch_guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Safe default-branch guard
+        run: echo "This is only a dispatcher stub. Select galaxite-preview when manually running the ingestion workflow."
