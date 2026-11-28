@@ -304,7 +304,7 @@ function wcard(w, i, pin) {
     const premium = hasChapterMetadata && V.premium(w, c);
     const locked = premium && V.locked(w, c);
     const date = formatAsuraDate(chapter.source_published_at);
-    const chapterTitle = chapter.display_title || chapter.title || ("الفصل " + nm(c));
+    const chapterTitle = "الفصل " + nm(c);
     const status = locked
       ? `<em class="new">${IC.lock} مقفول</em>`
       : premium
