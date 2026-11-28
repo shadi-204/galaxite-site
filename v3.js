@@ -172,6 +172,20 @@ home = function () {
   const html = (an && !q ? `<div class="annc">${esc(an)}</div>` : "") + (pins.length ? `<h3 class="h">مثبتة</h3><div class="wgrid pins">${pins.map((w, i) => wcard(w, i, 1)).join("")}</div>` : "") + `<div class="lh"><h3 class="h">آخر الإصدارات</h3><div class="ltabs"><button data-l="latest" class="${lt === "latest" ? "on" : ""}">الأحدث</button><button data-l="new" class="${lt === "new" ? "on" : ""}">الجديد</button></div></div><div class="wgrid">${ord.map((w, i) => wcard(w, i)).join("")}</div>`;
   if (hd && hd.classList.contains("h")) hd.remove();
   old.outerHTML = html;
+  const recentGrid = [...document.querySelectorAll("#app .wgrid")].find((el) => !el.classList.contains("pins"));
+  if (recentGrid && !q) {
+    recentGrid.innerHTML = '<p class="empty">جارٍ تحميل آخر الفصول المنشورة...</p>';
+    window.GALAXITE_DB_CATALOG?.getLatestChapters(24).then((rows) => {
+      if (!recentGrid.isConnected) return;
+      const entries = (rows || []).map((row) => ({ row, w: WORKS.find((item) => String(item.id) === String(row.work_id)) }))
+        .filter((item) => item.w && (tab === "all" || item.w.type === tab));
+      recentGrid.innerHTML = entries.length ? entries.map(({row,w}) => `
+        <div class="wc"><a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}</a>
+          <div class="wci"><a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
+            <a class="wr" href="#/r/${slug(w)}/${Number(row.chapter_number)}"><span>${esc(row.title || ("الفصل " + nm(row.chapter_number)))}</span><small>${row.created_at ? new Date(row.created_at).toLocaleDateString("ar-EG") : ""}</small></a>
+          </div></div>`).join("") : '<p class="empty">لا توجد فصول منشورة حديثًا.</p>';
+    });
+  }
   document.querySelectorAll(".ltabs button").forEach((b) => (b.onclick = () => { lt = b.dataset.l; home(); }));
   document.querySelectorAll("#app .wc, #app .lh").forEach((e) => e.classList.add("rv")); VX.reveal($("#app"));
 };
