@@ -6,7 +6,7 @@ It does not sign in, bypass gates, or fetch protected chapter content.
 from __future__ import annotations
 
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 import re
 
 
@@ -107,11 +107,28 @@ def parse_detail(html: str, page_url: str) -> dict:
     if cover:
         cover = urljoin(page_url, cover)
     chapters = {}
+    genres = {}
     for anchor in parser.anchors:
         absolute = urljoin(page_url, anchor["href"])
         parsed = urlparse(absolute)
+        if parsed.hostname != "asurascans.com":
+            continue
+
+        # Asura exposes genre chips as links such as /browse?genres=action.
+        # Keep the visible label, using the query slug only as a fallback.
+        query = parse_qs(parsed.query)
+        if parsed.path.rstrip("/") in {"/browse", "/browse/comics"}:
+            for key in ("genres", "genre"):
+                for raw_genre in query.get(key, []):
+                    value = raw_genre.strip().lower()
+                    if not value:
+                        continue
+                    label = anchor["text"].strip() or value.replace("-", " ").title()
+                    if len(label) <= 60:
+                        genres[value] = label
+
         match = CHAPTER_PATH.match(parsed.path)
-        if parsed.hostname != "asurascans.com" or not match:
+        if not match:
             continue
         number = float(match.group(2))
         chapters[number] = {
@@ -139,7 +156,7 @@ def parse_detail(html: str, page_url: str) -> dict:
         "chapters": sorted(chapters.values(), key=lambda x: x["number"]),
         "type": work_type,
         "status": status,
-        "genres": [],
+        "genres": sorted(genres.values(), key=str.casefold),
     }
 
 
