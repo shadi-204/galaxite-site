@@ -835,3 +835,165 @@ body.gx-home-page .gchip {
     animation: gxHeroCopyIn .62s cubic-bezier(.2,.75,.25,1) both;
   }
 }
+
+
+/* Mobile homepage work cards: one full-width card per row, with an undistorted cover. */
+@media (max-width: 640px) {
+  body.gx-home-page .wgrid,
+  body.gx-home-page .wgrid.pins,
+  body.gx-home-page .wgrid.latest-chapters {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px;
+  }
+  body.gx-home-page .wgrid .wc {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    min-width: 0;
+    gap: 12px;
+    padding: 11px;
+  }
+  body.gx-home-page .wgrid .wcv {
+    display: block;
+    flex: 0 0 100px;
+    width: 100px;
+    min-width: 100px;
+    overflow: hidden;
+  }
+  body.gx-home-page .wgrid .wcv > .cover {
+    display: block;
+    width: 100px !important;
+    min-width: 100px;
+    max-width: 100px;
+    height: auto !important;
+    aspect-ratio: 2 / 3;
+    padding: 0;
+    object-fit: cover;
+    flex: none;
+  }
+  body.gx-home-page .wgrid .wci {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 7px;
+  }
+  body.gx-home-page .wgrid .wt {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  body.gx-home-page .wgrid .wm {
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  body.gx-home-page .wgrid .wr {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    gap: 8px;
+    padding: 6px 9px;
+    align-items: center;
+  }
+  body.gx-home-page .wgrid .wr > span {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+  body.gx-home-page .wgrid .wr > small {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+}
+
+/* Calm, consistent search focus and text selection. */
+#q,
+#q:focus,
+#q:focus-visible {
+  outline: none !important;
+  transition: color .28s ease, background-color .28s ease, border-color .28s ease, box-shadow .28s ease;
+}
+#q:focus,
+#q:focus-visible {
+  border-color: #ef4444b8 !important;
+  box-shadow: 0 0 0 3px #ef444422 !important;
+}
+::selection {
+  background: #ef444455;
+  color: inherit;
+}
+
+/* Cross-fade the dark and light page backdrops instead of swapping gradients instantly. */
+html {
+  min-height: 100%;
+  background: #0a0a0a;
+}
+body {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: transparent !important;
+  transition: color .34s ease;
+}
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity .36s ease;
+}
+body::before {
+  opacity: 1;
+  background:
+    radial-gradient(900px 420px at 85% -12%, #dc262620, transparent 60%),
+    #0a0a0a;
+}
+body::after {
+  opacity: 0;
+  background:
+    radial-gradient(900px 420px at 85% -12%, #dc26261a, transparent 60%),
+    #f6f4f4;
+}
+body.light::before { opacity: 0; }
+body.light::after { opacity: 1; }
+
+/* Smooth theme color changes across the main site surfaces. */
+.head,
+#app,
+.foot,
+#q,
+#tabs button,
+#theme,
+#mnav a,
+#bnav,
+.card,
+.wc,
+.item,
+.stat3 > div,
+.wr,
+.ch,
+.gchip,
+.ltabs button,
+.stabs,
+.syn,
+.spinfo,
+.prof {
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: .34s;
+  transition-timing-function: ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    transition: none !important;
+  }
+}
