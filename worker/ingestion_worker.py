@@ -155,15 +155,21 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
         raise WorkerError("Asura source is not enabled and authorized.")
     page = max(1, int((job.get("payload") or {}).get("page") or 1))
     max_pages = max(1, min(30, int(os.getenv("ASURA_BROWSE_PAGES", "22"))))
-    browse_url = f"https://asurascans.com/browse?page={page}"
+    browse_url = f"https://asurascans.com/browse/comics?page={page}"
     raw, _ = _request(browse_url, {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
     listings = parse_listing(raw.decode("utf-8", "replace"), browse_url)
-    initial_chapters = max(0, min(10, int(os.getenv("ASURA_INITIAL_CHAPTERS", "3"))))
-    for entry in listings:
+    initial_chapters = max(0, min(10, int(os.getenv("ASURA_INITIAL_CHAPTERS", "1"))))
+    download_works = max(0, min(20, int(os.getenv("ASURA_INITIAL_WORKS_WITH_CHAPTERS", "1"))))
+    LOG.info("Asura page %s: parsed %s works; chapter downloads enabled for first %s works.", page, len(listings), download_works)
+    for work_index, entry in enumerate(listings):
         detail_raw, _ = _request(entry["url"], {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
         detail = parse_detail(detail_raw.decode("utf-8", "replace"), entry["url"])
-        title = detail["title"] or entry["title"]
+        title = (detail.get("title") or "").strip()
         if not title:
+            # Listing-card anchors can contain the rating instead of the title;
+            # only use a clean slug fallback if detail metadata is missing.
+            title = re.sub(r"-7de80a82$", "", entry["slug"], flags=re.I).replace("-", " ").title()
+        if not title or re.fullmatch(r"\\d+(?:\\.\\d+)?", title):
             continue
         existing = supabase.rows("site_works", "select=id&title=eq." + __import__("urllib.parse", fromlist=["quote"]).quote(title, safe="") + "&limit=1")
         fields = {
@@ -178,7 +184,8 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
         else:
             work_id = supabase.insert("site_works", fields)["id"]
         chapters = detail["chapters"]
-        selected_for_download = set(x["number"] for x in chapters[-initial_chapters:]) if initial_chapters else set()
+        selected_for_download = (set(x["number"] for x in chapters[-initial_chapters:])
+                                 if initial_chapters and work_index < download_works else set())
         for chapter in chapters:
             number = chapter["number"]
             query = f"select=id&work_id=eq.{work_id}&chapter_number=eq.{number}&limit=1"
