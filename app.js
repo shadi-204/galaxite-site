@@ -105,10 +105,19 @@ function series(w) {
     const premium = VX.premium(w, number), locked = premium && VX.locked(w, number);
     const latest = chapters[0]?.number;
     const isRead = (prog[w.title] || 0) >= number;
+    const publishedDate = chapter.created_at && !Number.isNaN(Date.parse(chapter.created_at))
+      ? new Date(chapter.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short", year: "numeric" })
+      : "";
+    const chapterMeta = [
+      number === latest ? '<em class="new">● جديد</em>' : "",
+      publishedDate ? `<time class="chapter-date" datetime="${esc(chapter.created_at)}">${esc(publishedDate)}</time>` : "",
+      premium ? (locked ? "مميز" : "مفتوح") : "",
+      (prog[w.title] || 0) === number ? "وصلت هنا" : ""
+    ].filter(Boolean).join(" · ");
     return `<div class="chr ${locked ? "lk" : ""} ${isRead ? "rd" : ""}">
       <a class="chapter-main" href="#/r/${slug(w)}/${number}">
         <span class="thm" style="background:${grad(w.title + number, number)}">${w.cover ? `<img class="chapter-thumb" src="${esc(w.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : locked ? "🔒" : "›"}</span>
-        <span class="cn"><b>${esc(chapter.title || ("الفصل " + number))}</b><small>${number === latest ? '<em class="new">● جديد</em>' : "فصل منشور"}${premium ? (locked ? " · مميز" : " · مفتوح") : ""}${(prog[w.title] || 0) === number ? " · وصلت هنا" : ""}</small></span>
+        <span class="cn"><b>${esc(chapter.title || ("الفصل " + number))}</b><small class="chapter-meta">${chapterMeta}</small></span>
       </a>
       ${locked ? `<span class="price">${VX.coin}<b>${VX.LOCK_COST}</b></span>` : `<span class="chapter-end">${premium ? `<span class="price ok">مفتوح</span>` : ""}<button class="chapter-heart" type="button" data-chapter-id="${esc(chapter.id || "")}" aria-label="أعجبني الفصل ${number}" aria-pressed="false"><span class="chapter-heart-icon" aria-hidden="true">♡</span><b class="chapter-heart-count">…</b></button></span>`}
     </div>`;
@@ -150,6 +159,9 @@ function reader(w, ch) {
   <div class="rbar"><span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>`;
 }
 function readerInit(w, ch) {
+  const previousCleanup = window.GALAXITE_READER_CLEANUP;
+  if (typeof previousCleanup === "function") previousCleanup();
+  window.GALAXITE_READER_CLEANUP = null;
   if (!$("#cj")) return;
   if ($("#reportChapter")) $("#reportChapter").onclick = () => window.GalaxiteReports?.open({ targetType: "chapter", targetId: `${slug(w)}#${ch}`, targetTitle: `${w.title} - الفصل ${ch}`, targetPath: `#/r/${slug(w)}/${ch}` });
   $("#cj").onchange = (e) => (location.hash = `#/r/${slug(w)}/${e.target.value}`);
@@ -162,22 +174,71 @@ function readerInit(w, ch) {
     const chapterMeta = chaptersFor(w).find((item) => item.number === Number(ch));
     const chapterId = chapterMeta?.id || null;
     const loadingMarkup = '<div class="page-loading skel" aria-hidden="true"></div><div class="page-loading skel" aria-hidden="true"></div>';
+    let latestPageUrls = [];
+    let retryingImages = false;
+    let retriedImagesOnce = false;
+
     const renderPages = (urls) => {
       if (!pageBox.isConnected) return;
-      pageBox.innerHTML = urls.length
-        ? urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="${i < 2 ? "eager" : "lazy"}" fetchpriority="${i === 0 ? "high" : "auto"}" decoding="async" referrerpolicy="no-referrer">`).join("")
+      latestPageUrls = Array.isArray(urls)
+        ? urls.filter((url) => typeof url === "string" && url.startsWith("https://"))
+        : [];
+      pageBox.innerHTML = latestPageUrls.length
+        ? latestPageUrls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="${i < 2 ? "eager" : "lazy"}" fetchpriority="${i === 0 ? "high" : "auto"}" decoding="async" referrerpolicy="no-referrer">`).join("")
         : '<div class="reader-empty"><b>صور الفصل غير متاحة حاليًا.</b><p>المصدر لم يرجّع صورًا عامة لهذا الفصل.</p><button class="cta alt" id="retryChapterPages" type="button">حاول مرة أخرى</button></div>';
+      pageBox.querySelectorAll("img").forEach((img) => {
+        img.addEventListener("error", () => {
+          if (retriedImagesOnce || retryingImages || !pageBox.isConnected) return;
+          retriedImagesOnce = true;
+          loadPages(true);
+        }, { once: true });
+      });
       const retry = $("#retryChapterPages");
-      if (retry) retry.onclick = () => loadPages(true);
+      if (retry) retry.onclick = () => {
+        retriedImagesOnce = false;
+        loadPages(true);
+      };
     };
     const loadPages = (forceRefresh = false) => {
+      if (!pageBox.isConnected) return Promise.resolve([]);
+      retryingImages = forceRefresh;
       pageBox.innerHTML = loadingMarkup;
-      window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch, chapterId, forceRefresh)
-        .then(renderPages)
+      return window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch, chapterId, forceRefresh)
+        .then((urls) => {
+          renderPages(urls);
+          return urls;
+        })
         .catch((error) => {
           console.warn("Reader image request failed.", error);
           renderPages([]);
-        });
+          return [];
+        })
+        .finally(() => { retryingImages = false; });
+    };
+
+    // Rebuild the image elements after switching Desktop/mobile viewport modes.
+    const restoreReaderImages = () => {
+      if (!pageBox.isConnected) return;
+      window.requestAnimationFrame(() => {
+        if (!pageBox.isConnected) return;
+        if (latestPageUrls.length) renderPages(latestPageUrls);
+        else if (!pageBox.querySelector(".reader-empty")) loadPages(true);
+      });
+    };
+    const readerBreakpoint = window.matchMedia("(max-width: 640px)");
+    const onVisibilityChange = () => { if (!document.hidden) restoreReaderImages(); };
+    const onPageShow = (event) => { if (event.persisted) restoreReaderImages(); };
+    if (readerBreakpoint.addEventListener) readerBreakpoint.addEventListener("change", restoreReaderImages);
+    else if (readerBreakpoint.addListener) readerBreakpoint.addListener(restoreReaderImages);
+    window.addEventListener("orientationchange", restoreReaderImages);
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.GALAXITE_READER_CLEANUP = () => {
+      if (readerBreakpoint.removeEventListener) readerBreakpoint.removeEventListener("change", restoreReaderImages);
+      else if (readerBreakpoint.removeListener) readerBreakpoint.removeListener(restoreReaderImages);
+      window.removeEventListener("orientationchange", restoreReaderImages);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
     loadPages();
   }
