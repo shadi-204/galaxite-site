@@ -380,3 +380,298 @@ body.gx-reader-mode .fab.gx-controls-hidden {
     pointer-events: none;
   }
 }
+
+
+/* Home page mobile rhythm: keep the existing Galaxite look, fix only spacing and fit. */
+@media (max-width: 640px) {
+  body.gx-home-page main#app {
+    padding: 10px 12px calc(112px + env(safe-area-inset-bottom)) !important;
+    width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  body.gx-home-page #app > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body.gx-home-page .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    width: 100%;
+    min-width: 0;
+    min-height: clamp(270px, 82vw, 330px);
+    margin: 8px 0 18px;
+    border-radius: 20px;
+  }
+
+  body.gx-home-page .hero-in {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 8px;
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    padding: 20px 16px 42px;
+    line-height: 1.65;
+  }
+
+  body.gx-home-page .hero-in .badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 26px;
+  }
+
+  body.gx-home-page .hero h2 {
+    width: 100%;
+    max-width: 100%;
+    margin: 2px 0;
+    font-size: clamp(22px, 6.3vw, 30px);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  body.gx-home-page .hero p {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.75;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+
+  body.gx-home-page .hero .cta {
+    min-height: 40px;
+    margin: 2px 0 0;
+    padding: 0 18px;
+  }
+
+  body.gx-home-page .hero .dots {
+    bottom: 10px;
+    top: auto;
+    inset-inline: 0;
+    justify-content: center;
+    transform: none;
+    z-index: 3;
+  }
+
+  body.gx-home-page .stat3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    margin: 12px 0 4px;
+  }
+
+  body.gx-home-page .stat3 div {
+    min-width: 0;
+    padding: 11px 4px;
+    border-radius: 13px;
+  }
+
+  body.gx-home-page .stat3 b {
+    font-size: clamp(18px, 6vw, 23px);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  body.gx-home-page .stat3 span {
+    display: block;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  body.gx-home-page .gstrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.gx-home-page .gchip {
+    min-height: 34px;
+    max-width: 100%;
+    padding: 6px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  body.gx-home-page .rh {
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  body.gx-home-page .rh .h {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 20px 0 10px;
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  body.gx-home-page .arr {
+    flex: 0 0 auto;
+    gap: 5px;
+  }
+
+  body.gx-home-page .arr button {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+
+  body.gx-home-page .row {
+    width: 100%;
+    min-width: 0;
+    gap: 11px;
+    padding: 2px 2px 10px;
+    overscroll-behavior-inline: contain;
+  }
+
+  body.gx-home-page .row .card {
+    flex: 0 0 clamp(116px, 38vw, 142px);
+    min-width: 0;
+  }
+
+  body.gx-home-page .row .card .name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    min-height: 2.8em;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  body.gx-home-page .top10 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  body.gx-home-page .top10 a {
+    width: 100%;
+    min-width: 0;
+    gap: 9px;
+    padding: 9px;
+  }
+
+  body.gx-home-page .top10 .num {
+    flex: 0 0 28px;
+    width: 28px;
+    font-size: 27px;
+  }
+
+  body.gx-home-page .top10 .cover.sm {
+    flex: 0 0 54px;
+    width: 54px;
+  }
+
+  body.gx-home-page .top10 span {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  body.gx-home-page .top10 small {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: 11px;
+  }
+
+  body.gx-home-page .latest {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+    gap: 9px;
+  }
+
+  body.gx-home-page .latest .item {
+    width: 100%;
+    min-width: 0;
+    gap: 9px;
+    padding: 9px;
+    border-radius: 14px;
+  }
+
+  body.gx-home-page .latest .item > a {
+    flex: 0 0 58px;
+    min-width: 0;
+  }
+
+  body.gx-home-page .latest .cover.sm {
+    width: 58px;
+    height: 87px;
+    flex: 0 0 58px;
+  }
+
+  body.gx-home-page .latest .item > div {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  body.gx-home-page .latest .t {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  body.gx-home-page .latest .ch {
+    min-width: 0;
+    gap: 8px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  body.gx-home-page .latest .ch span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.gx-home-page .latest .ch small {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+
+  body.gx-home-page .h {
+    margin-block: 20px 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  body.gx-home-page main#app {
+    padding-inline: 10px;
+  }
+
+  body.gx-home-page .hero {
+    min-height: 282px;
+  }
+
+  body.gx-home-page .hero-in {
+    padding-inline: 13px;
+  }
+
+  body.gx-home-page .row .card {
+    flex-basis: 116px;
+  }
+
+  body.gx-home-page .stat3 b {
+    font-size: 18px;
+  }
+}
