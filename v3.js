@@ -269,43 +269,155 @@ readerInit = function (w, ch) {
   window.addEventListener("hashchange", cleanup, { once: true });
 };
 
-/* ---------- الرئيسية: بطاقات المثبت وآخر الإصدارات ---------- */
+/* ---------- الرئيسية: الأعمال المثبتة وآخر تحديثات Asura ---------- */
 let lt = "latest";
+const formatAsuraDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("ar-EG", {
+    day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Cairo"
+  }).format(date);
+};
+const pinnedChapterLoads = new Set();
+
 function wcard(w, i, pin) {
-  const V = window.VX, first = Array.from({ length: w.chapters }, (_, k) => w.chapters - k).find((c) => !V.premium(w, c));
-  const rows = [0, 1, 2].map((k) => { const c = w.chapters - k, lk = V.locked(w, c), pr = V.premium(w, c);
-    return `<a class="wr ${lk ? "lk" : c === first && pr === false && w.chapters > 10 && w.status === "مستمر" ? "fr" : ""}" href="#/r/${slug(w)}/${c}"><span>${lk ? IC.lock : ""}الفصل ${nm(c)}</span>${lk ? `<em class="new">${IC.fire} جديد</em>` : c === first && w.status === "مستمر" && w.chapters > 10 ? `<em class="free">${IC.unlock} مجاني الآن</em>` : k === 0 && i % 2 === 0 ? `<em class="new">${IC.fire} جديد</em>` : `<small>${ago[(i + k) % ago.length]}</small>`}</a>`; }).join("");
-  return `<div class="wc"><a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}${pin ? '<b class="pin">مثبت</b>' : ""}</a><div class="wci"><a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a><div class="wm"><span>${IC.star} ${w.rating}</span><span class="st ${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</span></div>${rows}</div></div>`;
+  const V = window.VX;
+  const hasChapterMetadata = Array.isArray(w.publishedChapters);
+  const chapterRows = (hasChapterMetadata
+    ? [...w.publishedChapters]
+    : Array.from({ length: Math.min(3, Math.max(0, Number(w.chapters) || 0)) }, (_, k) => ({
+        chapter_number: Number(w.chapters) - k,
+        title: "",
+        is_premium: false
+      })))
+    .map((chapter) => ({
+      ...chapter,
+      number: Number(chapter.chapter_number ?? chapter.number)
+    }))
+    .filter((chapter) => Number.isFinite(chapter.number) && chapter.number > 0)
+    .sort((a, b) => b.number - a.number)
+    .slice(0, 3);
+
+  const rows = chapterRows.map((chapter, k) => {
+    const c = chapter.number;
+    const premium = hasChapterMetadata && V.premium(w, c);
+    const locked = premium && V.locked(w, c);
+    const date = formatAsuraDate(chapter.source_published_at);
+    const chapterTitle = chapter.display_title || chapter.title || ("الفصل " + nm(c));
+    const status = locked
+      ? `<em class="new">${IC.lock} مقفول</em>`
+      : premium
+        ? '<em class="free">مفتوح</em>'
+        : date ? `<small>${esc(date)}</small>` : "";
+    return `<a class="wr ${locked ? "lk" : ""}" href="#/r/${slug(w)}/${c}">
+      <span>${locked ? IC.lock : ""}${esc(chapterTitle)}</span>
+      ${status}
+    </a>`;
+  }).join("");
+
+  const workDate = formatAsuraDate(w.source_updated_at);
+  return `<div class="wc">
+    <a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}${pin ? '<b class="pin">مثبت</b>' : ""}</a>
+    <div class="wci">
+      <a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
+      <div class="wm"><span>${IC.star} ${w.rating}</span><span class="st ${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</span></div>
+      ${workDate ? `<small class="work-source-date">آخر تحديث على Asura: ${esc(workDate)}</small>` : ""}
+      ${rows || '<small class="work-source-date">لا توجد فصول منشورة مسجلة</small>'}
+      ${!hasChapterMetadata && chapterRows.length ? '<small class="work-source-date">جارٍ تحميل حالة الفصول...</small>' : ""}
+    </div>
+  </div>`;
 }
+
 const _home = home;
 home = function () {
   _home();
   const q = $("#q").value.trim();
-  const old = document.querySelector(".latest"); if (!old) return;
+  const old = document.querySelector(".latest");
+  if (!old) return;
+
   const list = WORKS.filter((w) => (tab === "all" || w.type === tab) && hit(w, q.toLowerCase()));
-  const ord = lt === "new" ? [...list].sort((a, b) => a.chapters - b.chapters) : list;
-  const sp = S("vx-pins", null); const pins = !q ? (sp ? sp.map(byTitle).filter(Boolean) : [...list].sort((a, b) => b.rating - a.rating).slice(0, 3)) : [];
+  const ord = lt === "new"
+    ? [...list].sort((a, b) => {
+        const ad = Date.parse(a.source_updated_at || "") || 0;
+        const bd = Date.parse(b.source_updated_at || "") || 0;
+        return bd - ad || (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+      })
+    : list;
+
+  const sp = S("vx-pins", null);
+  const pins = !q ? (sp ? sp.map(byTitle).filter(Boolean) : [...list].sort((a, b) => b.rating - a.rating).slice(0, 3)) : [];
   const an = S("vx-announce", "");
   const hd = old.previousElementSibling;
-  const html = (an && !q ? `<div class="annc">${esc(an)}</div>` : "") + (pins.length ? `<h3 class="h">مثبتة</h3><div class="wgrid pins">${pins.map((w, i) => wcard(w, i, 1)).join("")}</div>` : "") + `<div class="lh"><h3 class="h">آخر الإصدارات</h3><div class="ltabs"><button data-l="latest" class="${lt === "latest" ? "on" : ""}">الأحدث</button><button data-l="new" class="${lt === "new" ? "on" : ""}">الجديد</button></div></div><div class="wgrid">${ord.map((w, i) => wcard(w, i)).join("")}</div>`;
+  const showWorkCards = Boolean(q) || lt === "new";
+  const sectionTitle = showWorkCards ? "الأعمال الأجدد على Asura" : "أحدث الفصول على Asura";
+  const mainGrid = showWorkCards
+    ? `<div class="wgrid">${ord.map((w, i) => wcard(w, i, 0)).join("") || '<p class="empty">لا توجد أعمال مطابقة.</p>'}</div>`
+    : '<div class="wgrid latest-chapters"><p class="empty">جارٍ تحميل أحدث الفصول من Asura...</p></div>';
+
+  const html = (an && !q ? `<div class="annc">${esc(an)}</div>` : "")
+    + (pins.length ? `<h3 class="h">مثبتة</h3><div class="wgrid pins">${pins.map((w, i) => wcard(w, i, 1)).join("")}</div>` : "")
+    + `<div class="lh"><h3 class="h">${sectionTitle}</h3><div class="ltabs">
+        <button data-l="latest" class="${lt === "latest" ? "on" : ""}">الأحدث</button>
+        <button data-l="new" class="${lt === "new" ? "on" : ""}">الأجدد</button>
+      </div></div>`
+    + mainGrid;
+
   if (hd && hd.classList.contains("h")) hd.remove();
   old.outerHTML = html;
-  const recentGrid = [...document.querySelectorAll("#app .wgrid")].find((el) => !el.classList.contains("pins"));
-  if (recentGrid && !q) {
-    recentGrid.innerHTML = '<p class="empty">جارٍ تحميل آخر الفصول المنشورة...</p>';
-    window.GALAXITE_DB_CATALOG?.getLatestChapters(24).then((rows) => {
-      if (!recentGrid.isConnected) return;
-      const entries = (rows || []).map((row) => ({ row, w: WORKS.find((item) => String(item.id) === String(row.work_id)) }))
-        .filter((item) => item.w && (tab === "all" || item.w.type === tab));
-      recentGrid.innerHTML = entries.length ? entries.map(({row,w}) => `
-        <div class="wc"><a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}</a>
-          <div class="wci"><a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
-            <a class="wr" href="#/r/${slug(w)}/${Number(row.chapter_number)}"><span>${esc(row.title || ("الفصل " + nm(row.chapter_number)))}</span><small>${row.created_at ? new Date(row.created_at).toLocaleDateString("ar-EG") : ""}</small></a>
-          </div></div>`).join("") : '<p class="empty">لا توجد فصول منشورة حديثًا.</p>';
+
+  // Fetch the real per-chapter premium flags for pinned works before showing lock icons.
+  const missingPinned = pins.filter((w) =>
+    w.id && !Array.isArray(w.publishedChapters) && !w._chapterLoadFailed && !pinnedChapterLoads.has(String(w.id))
+  );
+  if (missingPinned.length) {
+    const pending = missingPinned.map((w) => {
+      const id = String(w.id);
+      pinnedChapterLoads.add(id);
+      return (window.GALAXITE_DB_CATALOG?.getWorkChapters?.(w.id) || Promise.reject(new Error("Chapter API unavailable")))
+        .then((rows) => { w.publishedChapters = Array.isArray(rows) ? rows : []; })
+        .catch((error) => {
+          w._chapterLoadFailed = true;
+          console.warn("Pinned chapter metadata unavailable.", error);
+        })
+        .finally(() => pinnedChapterLoads.delete(id));
+    });
+    Promise.all(pending).then(() => {
+      if (!location.hash || location.hash === "#" || location.hash === "#/") home();
     });
   }
-  document.querySelectorAll(".ltabs button").forEach((b) => (b.onclick = () => { lt = b.dataset.l; home(); }));
-  document.querySelectorAll("#app .wc, #app .lh").forEach((e) => e.classList.add("rv")); VX.reveal($("#app"));
+
+  const recentGrid = document.querySelector("#app .latest-chapters");
+  if (recentGrid && !q && lt === "latest") {
+    window.GALAXITE_DB_CATALOG?.getLatestChapters(24).then((rows) => {
+      if (!recentGrid.isConnected) return;
+      const entries = (rows || []).map((row) => ({
+        row,
+        w: WORKS.find((item) => String(item.id) === String(row.work_id))
+      })).filter((item) => item.w && (tab === "all" || item.w.type === tab));
+
+      recentGrid.innerHTML = entries.length ? entries.map(({ row, w }) => {
+        const date = formatAsuraDate(row.source_published_at);
+        const title = row.display_title || row.title || ("الفصل " + nm(row.chapter_number));
+        return `<div class="wc">
+          <a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}</a>
+          <div class="wci">
+            <a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
+            <a class="wr" href="#/r/${slug(w)}/${Number(row.chapter_number)}">
+              <span>${esc(title)}</span><small>${esc(date || "تاريخ Asura غير متاح")}</small>
+            </a>
+          </div>
+        </div>`;
+      }).join("") : '<p class="empty">لا توجد فصول منشورة بتاريخ متاح من Asura.</p>';
+    });
+  }
+
+  document.querySelectorAll(".ltabs button").forEach((b) => (b.onclick = () => {
+    lt = b.dataset.l;
+    home();
+  }));
+  document.querySelectorAll("#app .wc, #app .lh").forEach((e) => e.classList.add("rv"));
+  VX.reveal($("#app"));
 };
 
 return { pages, community, top, series };
