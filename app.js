@@ -158,7 +158,7 @@ function reader(w, ch) {
   const chapterTitle = chapters.find((chapter) => chapter.number === ch)?.title || `الفصل ${ch}`;
   const options = chapters.map((numberRow) => `<option value="${numberRow.number}"${numberRow.number === ch ? " selected" : ""}>${esc(numberRow.title || ("الفصل " + numberRow.number))}</option>`).join("");
   $("#app").innerHTML = `<div class="reader-topbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
-  <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
+  <span><button id="zo" type="button" aria-label="إبطاء التمرير التلقائي" title="إبطاء التمرير التلقائي">−</button><button id="zi" type="button" aria-label="تسريع التمرير التلقائي" title="تسريع التمرير التلقائي">+</button></span>
   <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الفصل السابق</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الفصل التالي</a>` : ""}</span></div>
   <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="page-loading skel" aria-hidden="true"></div>`}</div>
   <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل التالي ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>`;
@@ -170,8 +170,7 @@ function readerInit(w, ch) {
   if (!$("#cj")) return;
   if ($("#reportChapter")) $("#reportChapter").onclick = () => window.GalaxiteReports?.open({ targetType: "chapter", targetId: `${slug(w)}#${ch}`, targetTitle: `${w.title} - الفصل ${ch}`, targetPath: `#/r/${slug(w)}/${ch}` });
   $("#cj").onchange = (e) => (location.hash = `#/r/${slug(w)}/${e.target.value}`);
-  const z = (d) => { const v = Math.max(360, Math.min(1200, store.get("zoom", 760) + d)); store.set("zoom", v); document.querySelector(".pages").style.maxWidth = v + "px"; };
-  $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
+  // The + and − controls adjust automatic reader-scroll speed in v3.js.
 
   const readerTopbar = document.querySelector(".reader-topbar");
   let readerBarLastY = window.scrollY || 0;
@@ -389,6 +388,7 @@ function route() {
   }
   const p = location.hash.slice(2).split("/");
   const readerMode = p[0] === "r";
+  document.body.classList.toggle("gx-home-page", p[0] === "");
   document.body.classList.toggle("gx-reader-mode", readerMode);
   if (!readerMode) {
     window.GALAXITE_READER_UI_CLEANUP?.();
