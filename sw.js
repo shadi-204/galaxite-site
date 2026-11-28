@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "galaxite-mobile-";
-const V = CACHE_PREFIX + "v14";
+const V = CACHE_PREFIX + "v15";
 const FILES = [
   "./",
   "./index.html",
@@ -16,6 +16,7 @@ const FILES = [
   "./v3.js",
   "./v4.js",
   "./auth-config.js",
+  "./supabase-client.js",
   "./payments-config.js",
   "./icon.svg",
   "./manifest.webmanifest"
