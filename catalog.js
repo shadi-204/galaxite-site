@@ -1,35 +1,53 @@
 /* Live Galaxite catalog and private chapter-page delivery. */
 (() => {
-  const cfg = window.AUTH_CONFIG || {};
   const getClient = async () => {
     if (window.GALAXITE_SUPABASE_CLIENT) return window.GALAXITE_SUPABASE_CLIENT;
     if (typeof window.GALAXITE_GET_SUPABASE_CLIENT === "function") return await window.GALAXITE_GET_SUPABASE_CLIENT();
     return null;
   };
+  const state = (status, message = "") => {
+    window.GALAXITE_CATALOG_STATE = { status, message };
+    window.dispatchEvent(new Event("galaxite:catalog-state"));
+  };
   async function refresh() {
+    state("loading");
     try {
       const db = await getClient();
-      if (!db) return;
+      if (!db) throw new Error("Supabase client unavailable.");
       const { data, error } = await db.from("site_works")
         .select("id,title,type,genres,rating,status,description,chapter_count,cover_url,sort_order")
-        .eq("is_published", true)
-        .order("sort_order", { ascending: true });
-      if (error || !Array.isArray(data) || !data.length) return;
-      const rows = data.map((w) => ({
-        id: w.id,
-        title: w.title,
-        type: w.type,
+        .eq("is_published", true).order("sort_order", { ascending: true });
+      if (error) throw error;
+      const rows = (data || []).map((w) => ({
+        id: w.id, title: w.title, type: w.type,
         genres: Array.isArray(w.genres) ? w.genres : [],
-        rating: Number(w.rating || 0),
-        status: w.status || "مستمر",
-        desc: w.description || "",
-        chapters: Number(w.chapter_count || 0),
+        rating: Number(w.rating || 0), status: w.status || "مستمر",
+        desc: w.description || "", chapters: Number(w.chapter_count || 0),
         cover: w.cover_url || ""
       }));
       window.GALAXITE_SET_WORKS?.(rows);
+      state("ready");
       window.dispatchEvent(new Event("galaxite:catalog-updated"));
+      return rows;
     } catch (error) {
-      console.warn("Galaxite live catalog unavailable; using bundled catalog.", error);
+      console.error("Galaxite catalog load failed.", error);
+      state("error", "تعذر تحميل مكتبة الأعمال من قاعدة البيانات.");
+      window.dispatchEvent(new Event("galaxite:catalog-updated"));
+      return [];
+    }
+  }
+  async function getLatestChapters(limit = 40) {
+    try {
+      const db = await getClient();
+      if (!db) return [];
+      const { data, error } = await db.from("site_chapters")
+        .select("work_id,chapter_number,title,created_at")
+        .eq("is_published", true).order("created_at", { ascending: false }).limit(limit);
+      if (error) throw error;
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.warn("Latest chapter metadata unavailable.", error);
+      return [];
     }
   }
   async function getChapterPages(workId, chapterNumber) {
@@ -37,26 +55,23 @@
       const db = await getClient();
       if (!db) return [];
       const { data: chapter, error: chapterError } = await db.from("site_chapters")
-        .select("id,is_published")
-        .eq("work_id", String(workId))
-        .eq("chapter_number", Number(chapterNumber))
-        .maybeSingle();
+        .select("id,is_published").eq("work_id", String(workId))
+        .eq("chapter_number", Number(chapterNumber)).maybeSingle();
       if (chapterError || !chapter?.is_published) return [];
       const { data: pages, error: pagesError } = await db.from("site_chapter_pages")
-        .select("page_number,storage_path")
-        .eq("chapter_id", chapter.id)
+        .select("page_number,storage_path").eq("chapter_id", chapter.id)
         .order("page_number", { ascending: true });
       if (pagesError || !Array.isArray(pages) || !pages.length) return [];
       const signed = await Promise.all(pages.map(async (page) => {
         const { data, error } = await db.storage.from("galaxite-chapters").createSignedUrl(page.storage_path, 3600);
         return error ? null : { page: page.page_number, url: data?.signedUrl || "" };
       }));
-      return signed.filter((item) => item?.url).sort((a,b) => a.page-b.page).map((item) => item.url);
+      return signed.filter((item) => item?.url).sort((x, y) => x.page - y.page).map((item) => item.url);
     } catch (error) {
       console.warn("Chapter pages unavailable.", error);
       return [];
     }
   }
-  window.GALAXITE_DB_CATALOG = { refresh, getChapterPages };
+  window.GALAXITE_DB_CATALOG = { refresh, getLatestChapters, getChapterPages };
   refresh();
 })();
