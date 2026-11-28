@@ -1,6 +1,6 @@
 # Galaxite ingestion worker
 
-This worker consumes **explicitly authorized Galaxite JSON feeds**. It does not scrape third-party comic sites or bypass access controls. Every imported work/chapter is created as unpublished and requires owner review. Nothing is automatically published.
+This worker supports two ingestion modes: an explicitly authorized Galaxite JSON feed, and the Asura Scans public-page adapter (`asura_scans`) for a source that the operator has permission to ingest. It does not sign in, bypass access controls, or fetch chapters that require access. Every imported work/chapter is created as unpublished and requires owner review. Nothing is automatically published.
 
 ## Feed contract
 
@@ -33,6 +33,12 @@ The authorized source must serve `https://YOUR-DOMAIN/galaxite-feed.json`:
 
 Only use content you own or have written permission to ingest. The worker restricts page URLs to the same host as the registered feed, HTTPS only, public IP addresses only, images up to 18 MiB each, 200 pages per chapter, and 100 works per feed. It rejects unknown adapters and non-authorized/disabled sources.
 
+## Asura Scans adapter
+
+The `asura_scans` adapter reads the public browse pages (`/browse?page=N`), comic detail pages (`/comics/{slug-id}`), and publicly accessible chapter pages. It processes one browse page per discovery job to keep each run bounded. It imports chapter metadata for discovered series and queues page downloads for only the newest three chapters per series by default. Configure `ASURA_INITIAL_CHAPTERS` (0–10) and `ASURA_BROWSE_PAGES` (1–30) to adjust those limits. Page images are accepted only from `cdn.asurascans.com`; premium/login-gated chapters are not bypassed and will be marked for attention if their pages are unavailable.
+
+For Asura, register `base_url=https://asurascans.com/comics` and `adapter_key=asura_scans`. Keep the source disabled until the private worker is deployed and its health has been verified. The database currently has duplicate legacy Asura source rows; consolidate to one enabled row before starting live ingestion.
+
 ## Deploy in a private worker service
 
 Use Python 3.11+ and install:
@@ -48,6 +54,8 @@ Set these environment variables in the worker host's secret manager (never in Gi
 - `SUPABASE_SERVICE_ROLE_KEY` (server-side secret only)
 - `SUPABASE_CHAPTERS_BUCKET=galaxite-chapters` (optional)
 - `POLL_SECONDS=15` (optional)
+- `ASURA_INITIAL_CHAPTERS=3` (optional; newest chapters whose page images are queued)
+- `ASURA_BROWSE_PAGES=22` (optional; bounded browse pagination)
 
 The service-role key is highly privileged. Do not paste it into chat, commit it, or expose it to frontend code. Run one worker instance initially. The existing `claim_site_ingestion_job` RPC uses row locks to prevent two workers claiming the same job.
 
@@ -59,7 +67,7 @@ The service-role key is highly privileged. Do not paste it into chat, commit it,
 4. The worker queues `discover_works` automatically at the configured polling interval.
 5. Review imported items in the Galaxite admin dashboard and publish manually.
 
-The worker currently implements scheduled `discover_works` and `fetch_chapter`. Chapter localization/OCR/cleaning/translation/typesetting are separate stages and are not claimed to be automated by this worker. Private chapter images remain in the private Storage bucket. Configure the site's signed-URL reader before exposing those images to readers.
+The worker currently implements scheduled `discover_works`, `fetch_chapter`, and Asura-specific `fetch_asura_chapter`. Chapter localization/OCR/cleaning/translation/typesetting are separate stages and are not claimed to be automated by this worker. Private chapter images remain in the private Storage bucket. Configure the site's signed-URL reader before exposing those images to readers.
 
 ## Safety and failure handling
 
