@@ -43,7 +43,7 @@
 <script src="data.js"></script>
 <script src="account.js"></script>
 <script src="reports.js"></script>
-<script src="engagement.js"></script>
+<script src="engagement.js?v=31"></script>
 <script src="catalog.js"></script>
 <script src="app.js"></script>
 <script src="v3.js"></script>
@@ -52,7 +52,7 @@
 <script>
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    const key = "galaxite-sw-controller-reload-v30";
+    const key = "galaxite-sw-controller-reload-v31";
     if (sessionStorage.getItem(key) === "1") return;
     sessionStorage.setItem(key, "1");
     location.reload();
