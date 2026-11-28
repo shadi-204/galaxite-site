@@ -72,9 +72,9 @@
   }
 
   async function currentUser(db) {
-    const { data, error } = await db.auth.getUser();
+    const { data, error } = await db.auth.getSession();
     if (error) throw error;
-    return data?.user || null;
+    return data?.session?.user || null;
   }
 
   function renderRatingStats(work, stats) {
