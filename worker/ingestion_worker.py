@@ -371,7 +371,32 @@ def process_one(supabase: Supabase, worker_id: str) -> bool:
     return True
 
 
+def run_once() -> int:
+    """Run a bounded batch for scheduled CI runners; never idle or loop forever."""
+    url = os.environ["SUPABASE_URL"]
+    key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+    if not url.startswith("https://"):
+        raise SystemExit("SUPABASE_URL must use HTTPS.")
+    worker_id = os.getenv("WORKER_ID", f"galaxite-gha-{uuid.uuid4().hex[:10]}")
+    max_jobs = max(1, min(5, int(os.getenv("MAX_JOBS_PER_RUN", "1"))))
+    supabase = Supabase(url, key)
+    LOG.info("Galaxite scheduled worker starting: %s (max_jobs=%s)", worker_id, max_jobs)
+    schedule_discovery(supabase)
+    processed = 0
+    for _ in range(max_jobs):
+        if not process_one(supabase, worker_id):
+            break
+        processed += 1
+    LOG.info("Galaxite scheduled worker finished; claimed_jobs=%s", processed)
+    return processed
+
+
 def main() -> None:
+    if os.getenv("RUN_ONCE", "false").lower() in {"1", "true", "yes"}:
+        run_once()
+        return
+
+    # Local/manual continuous mode remains available for development only.
     url = os.environ["SUPABASE_URL"]
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     if not url.startswith("https://"):
