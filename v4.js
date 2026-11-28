@@ -5,7 +5,7 @@ const seed = (s) => { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0
 const hue = (t) => seed(t) % 360;
 const grad = (t) => `linear-gradient(135deg,hsl(${hue(t)},60%,40%),hsl(${(hue(t) + 60) % 360},55%,22%))`;
 const getGenres = () => [...new Set(WORKS.flatMap((w) => w.genres || []))].sort((a, b) => a.localeCompare(b));
-const pop = (w) => Number(w.rating || 0);
+const pop = (w) => w.ratingCount ? Number(w.rating || 0) : 0;
 const latestList = () => WORKS.map((w) => ({ w, ch: w.chapters, ago: null })).sort((a, b) => b.ch - a.ch);
 const agoTxt = (m) => (m < 60 ? `منذ ${nm(m)} د` : m < 1440 ? `منذ ${nm(Math.round(m / 60))} س` : `منذ ${nm(Math.round(m / 1440))} يوم`);
 const LS = { g: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, s: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
@@ -15,7 +15,7 @@ const ic = (p) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" s
 let bf = { q: "", st: "", ty: "", sort: "rating", g: [] };
 function browse() {
   const list = WORKS.filter((w) => hit(w, bf.q) && (!bf.st || w.status === bf.st) && (!bf.ty || w.type === bf.ty) && bf.g.every((g) => (w.genres || []).includes(g)))
-    .sort((a, b) => bf.sort === "rating" ? b.rating - a.rating : bf.sort === "pop" ? pop(b) - pop(a) : bf.sort === "ch" ? b.chapters - a.chapters : a.title.localeCompare(b.title));
+    .sort((a, b) => bf.sort === "rating" ? (b.rating - a.rating) || (b.ratingCount - a.ratingCount) : bf.sort === "pop" ? pop(b) - pop(a) : bf.sort === "ch" ? b.chapters - a.chapters : a.title.localeCompare(b.title));
   const chip = (k, v, l) => `<button class="v4chip ${bf[k] === v ? "on" : ""}" data-k="${k}" data-v="${v}">${l}</button>`;
   $("#app").innerHTML = `<h2 class="v4h"><span></span>تصفح الأعمال</h2><p class="v4sub">ابحث وفلتر حسب الحالة والنوع والتصنيف.</p>
   <div class="v4bw"><aside class="v4side"><h3>تصفية النتائج</h3>
@@ -25,7 +25,7 @@ function browse() {
    <b>التصنيفات</b><div>${getGenres().map((g) => `<button class="v4chip ${bf.g.includes(g) ? "on" : ""}" data-g="${g}">${g}</button>`).join("")}</div>
    <button class="v4chip" id="v4rs">مسح الكل</button></aside>
   <section><input id="v4q" class="v4q" type="search" placeholder="ابحث عن عمل..." value="${esc(bf.q)}"><p class="v4cnt">عدد النتائج: <b>${nm(list.length)}</b></p>
-  <div class="v4grid">${list.map((w) => card(w, `<b class="rate">★ ${w.rating}</b>`)).join("") || `<p class="empty">لا نتائج</p>`}</div></section></div>`;
+  <div class="v4grid">${list.map((w) => card(w, `<b class="rate">★ ${w.ratingCount ? Number(w.rating).toFixed(1) : "—"}</b>`)).join("") || `<p class="empty">لا نتائج</p>`}</div></section></div>`;
   document.querySelectorAll(".v4chip[data-k]").forEach((b) => (b.onclick = () => { bf[b.dataset.k] = b.dataset.v; browse(); }));
   document.querySelectorAll(".v4chip[data-g]").forEach((b) => (b.onclick = () => { const g = b.dataset.g; bf.g = bf.g.includes(g) ? bf.g.filter((x) => x !== g) : [...bf.g, g]; browse(); }));
   $("#v4rs").onclick = () => { bf = { q: "", st: "", ty: "", sort: "rating", g: [] }; browse(); };
@@ -57,9 +57,9 @@ function rankBlock(el) {
   let per = "d";
   const draw = () => {
     const K = { d: ["الأعلى تقييمًا"] };
-    const l = [...WORKS].sort((a, b) => pop(b) - pop(a)).slice(0, 8);
+    const l = [...WORKS].filter((w) => w.ratingCount > 0).sort((a, b) => pop(b) - pop(a) || b.ratingCount - a.ratingCount).slice(0, 8);
     el.innerHTML = `<h3 class="h">الأعلى تقييمًا</h3><div class="v4tabs">${Object.entries(K).map(([k, v]) => `<button class="${per === k ? "on" : ""}" data-p="${k}">${v[0]}</button>`).join("")}</div>
-    <ol class="v4rank">${l.map((w, i) => `<li class="${i ? "" : "first"}"><a href="#/s/${slug(w)}"><b>${nm(i + 1)}</b><div class="v4th s">${cover(w)}</div><span dir="auto">${esc(w.title)}<small>الفصل ${nm(w.chapters)} · تقييم ${Number(w.rating || 0).toFixed(1)}</small></span></a></li>`).join("")}</ol>`;
+    <ol class="v4rank">${l.length ? l.map((w, i) => `<li class="${i ? "" : "first"}"><a href="#/s/${slug(w)}"><b>${nm(i + 1)}</b><div class="v4th s">${cover(w)}</div><span dir="auto">${esc(w.title)}<small>الفصل ${nm(w.chapters)} · تقييم ${Number(w.rating || 0).toFixed(1)} (${nm(w.ratingCount)})</small></span></a></li>`).join("") : '<li class="empty">لسه مفيش تقييمات من القراء.</li>'}</ol>`;
     el.querySelectorAll("button").forEach((b) => (b.onclick = () => { per = b.dataset.p; draw(); }));
   };
   draw();
