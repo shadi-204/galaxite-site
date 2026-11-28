@@ -205,16 +205,15 @@
     const buttons = [...document.querySelectorAll(".chapter-heart[data-chapter-id]")];
     if (!buttons.length) return;
     const ids = [...new Set(buttons.map((button) => button.dataset.chapterId).filter(Boolean))];
-    if (!ids.length) {
-      buttons.forEach((button) => { button.disabled = true; });
-      return;
-    }
+    buttons.forEach((button) => { button.disabled = true; });
+    if (!ids.length) return;
 
     buttons.forEach((button) => {
       button.onclick = async (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (button.disabled) return;
+        button.disabled = true;
         try {
           const db = await getDb();
           const user = await currentUser(db);
@@ -222,7 +221,6 @@
             showLogin("سجّل دخولك الأول عشان تضيف قلب للفصل. إنشاء الحساب مجاني.");
             return;
           }
-          button.disabled = true;
           const { data, error } = await db.rpc("toggle_chapter_heart", {
             p_chapter_id: button.dataset.chapterId
           });
@@ -239,20 +237,23 @@
 
     try {
       const db = await getDb();
-      const { data, error } = await db.rpc("get_chapter_hearts_stats", {
+      const { data, error } = await db.rpc("get_chapter_heart_stats_many", {
         p_chapter_ids: ids
       });
       if (error) throw error;
       const byId = new Map((Array.isArray(data) ? data : [])
         .map((row) => [String(row.chapter_id), row]));
       buttons.forEach((button) => {
-        updateChapterListHeart(button, byId.get(String(button.dataset.chapterId)) || null);
+        const stats = byId.get(String(button.dataset.chapterId));
+        updateChapterListHeart(button, stats || { hearts_count: 0, is_liked: false });
+        button.disabled = false;
       });
     } catch (error) {
       console.warn("Chapter list heart stats unavailable.", error);
       buttons.forEach((button) => {
         const count = button.querySelector(".chapter-heart-count");
         if (count) count.textContent = "—";
+        button.disabled = false;
       });
     }
   }
