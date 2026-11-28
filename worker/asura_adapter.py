@@ -32,9 +32,14 @@ class _PageParser(HTMLParser):
         elif tag.lower() == "a":
             self._anchor = {"href": attrs.get("href", ""), "text": []}
         elif tag.lower() == "img":
-            for key in ("src", "data-src", "data-original"):
+            for key in ("src", "data-src", "data-original", "data-lazy-src"):
                 if attrs.get(key):
                     self.images.append(attrs[key].strip())
+            srcset = attrs.get("srcset") or attrs.get("data-srcset") or ""
+            for candidate in srcset.split(","):
+                candidate_url = candidate.strip().split(" ")[0]
+                if candidate_url:
+                    self.images.append(candidate_url)
         elif tag.lower() == "source":
             for key in ("src", "data-src"):
                 if attrs.get(key):
@@ -80,7 +85,21 @@ def parse_detail(html: str, page_url: str) -> dict:
     title = re.sub(r"\s*[|–-]\s*Asura Scans.*$", "", title, flags=re.I).strip()
     if not title:
         title = page_url.rstrip("/").split("/")[-1].rsplit("-", 1)[0].replace("-", " ").title()
-    cover = parser.metas.get("og:image") or parser.metas.get("twitter:image")
+    # Asura's current comic pages expose the real cover on its image CDN.
+    # The og:image URL (/og/comics/...) can be stale or fail as a hotlinked
+    # asset, so prefer the first actual cover image found in the page markup.
+    cover_candidates = []
+    for raw in parser.images:
+        absolute = urljoin(page_url, raw)
+        parsed_image = urlparse(absolute)
+        if (parsed_image.scheme == "https"
+                and parsed_image.hostname == "cdn.asurascans.com"
+                and "/asura-images/covers/" in parsed_image.path):
+            if absolute not in cover_candidates:
+                cover_candidates.append(absolute)
+    cover = cover_candidates[0] if cover_candidates else (
+        parser.metas.get("og:image") or parser.metas.get("twitter:image")
+    )
     if cover:
         cover = urljoin(page_url, cover)
     chapters = {}
