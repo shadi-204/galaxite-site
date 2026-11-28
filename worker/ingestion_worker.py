@@ -161,8 +161,8 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
     raw, _ = _request(browse_url, {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
     listings = parse_listing(raw.decode("utf-8", "replace"), browse_url)
     initial_chapters = max(0, min(10, int(os.getenv("ASURA_INITIAL_CHAPTERS", "1"))))
-    download_works = max(0, min(20, int(os.getenv("ASURA_INITIAL_WORKS_WITH_CHAPTERS", "1"))))
-    LOG.info("Asura page %s: parsed %s works; chapter downloads enabled for first %s works.", page, len(listings), download_works)
+    link_works = max(0, min(20, int(os.getenv("ASURA_INITIAL_WORKS_WITH_CHAPTERS", "20"))))
+    LOG.info("Asura page %s: parsed %s works; external image links enabled for first %s works.", page, len(listings), link_works)
     for work_index, entry in enumerate(listings):
         detail_raw, _ = _request(entry["url"], {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
         detail = parse_detail(detail_raw.decode("utf-8", "replace"), entry["url"])
@@ -178,15 +178,13 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
             "title": title[:300], "type": "manhwa", "genres": detail["genres"],
             "description": detail["description"], "cover_url": detail["cover_url"],
             "chapter_count": len(detail["chapters"]), "rating": 0,
-            "status": "مستمر", "sort_order": 0, "is_published": False,
+            "status": "مستمر", "sort_order": 0, "is_published": True,
         }
         if existing:
             work_id = existing[0]["id"]
-            # Refresh source metadata without ever changing an owner's publish decision.
-            update_fields = {key: value for key, value in fields.items() if key != "is_published"}
-            supabase.update("site_works", "id=eq." + work_id, update_fields)
+            # Asura is an explicitly enabled public catalog source; keep its works visible.
+            supabase.update("site_works", "id=eq." + work_id, fields)
         else:
-            # New imports always enter the private review queue.
             work_id = supabase.insert("site_works", fields)["id"]
         chapters = detail["chapters"]
         # Keep only the newest N chapter metadata rows per work. The full
@@ -200,9 +198,11 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
             query = f"select=id&work_id=eq.{work_id}&chapter_number=eq.{number}&limit=1"
             found = supabase.rows("site_chapters", query)
             chapter_fields = {"work_id": work_id, "chapter_number": number,
-                              "title": chapter["title"][:300] or None, "is_published": False}
+                              "title": chapter["title"][:300] or None,
+                              "source_url": chapter["url"], "is_published": True}
             if found:
                 chapter_id = found[0]["id"]
+                supabase.update("site_chapters", "id=eq." + chapter_id, chapter_fields)
             else:
                 chapter_id = supabase.insert("site_chapters", chapter_fields)["id"]
             if number in selected_for_download:
@@ -235,6 +235,9 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
 
 
 def _fetch_asura_chapter(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
+    """Refresh public image URLs only. Never download or upload chapter images."""
+    if source.get("authorization_status") != "authorized" or not source.get("enabled"):
+        raise WorkerError("Asura source is no longer enabled and authorized.")
     payload = job.get("payload") or {}
     chapter_url = str(payload.get("chapter_url") or "")
     if urlparse(_https_url(chapter_url)).hostname != "asurascans.com":
@@ -242,9 +245,21 @@ def _fetch_asura_chapter(supabase: Supabase, source: dict[str, Any], job: dict[s
     raw, _ = _request(chapter_url, {"Accept": "text/html"}, max_bytes=8 * 1024 * 1024)
     page_urls = parse_chapter(raw.decode("utf-8", "replace"), chapter_url)
     if not page_urls:
-        raise WorkerError("No public chapter page images were found; chapter may require access or page markup may have changed.")
-    payload["page_urls"] = page_urls
-    _fetch_chapter(supabase, source, {**job, "payload": payload})
+        raise WorkerError("No public chapter image links were found; chapter may require access or page markup may have changed.")
+    chapter_id = job.get("external_chapter_id")
+    if not chapter_id:
+        raise WorkerError("Chapter job is missing its chapter ID.")
+    # Replace only URL metadata. No image bytes are requested.
+    supabase.request("DELETE", f"/rest/v1/site_chapter_pages?chapter_id=eq.{chapter_id}")
+    for index, image_url in enumerate(page_urls, 1):
+        supabase.insert("site_chapter_pages", {
+            "chapter_id": chapter_id, "page_number": index, "image_url": image_url
+        })
+    supabase.update("site_chapters", "id=eq." + chapter_id, {"is_published": True})
+    supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {
+        "status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(),
+        "last_error": None, "locked_at": None, "locked_by": None,
+    })
 
 
 def _discover(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
