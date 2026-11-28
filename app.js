@@ -1,5 +1,3 @@
-// أعمال مضافة من لوحة الإدارة (على نفس المتصفح فقط)
-try { const o = JSON.parse(localStorage.getItem("vx-works")); if (Array.isArray(o) && o.length) WORKS.splice(0, WORKS.length, ...o); } catch {}
 const $ = (s) => document.querySelector(s);
 const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -81,11 +79,11 @@ function reader(w, ch) {
   if (VX.locked(w, ch)) return VX.lockedScreen(w, ch, slug(w));
   VX.track(w, ch);
   prog[w.title] = ch; store.set("prog", prog);
-  const pages = (w.pages && w.pages[ch]) || [1, 2, 3, 4].map((p) => null);
+  const pages = (w.pages && w.pages[ch]) || [];
   $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${Array.from({ length: w.chapters }, (_, i) => w.chapters - i).map((c) => `<option value="${c}"${c === ch ? " selected" : ""}>الفصل ${c}</option>`).join("")}</select>
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
   <span>${ch > 1 ? `<a href="#/r/${slug(w)}/${ch - 1}">السابق</a>` : ""}${ch < w.chapters ? `<a href="#/r/${slug(w)}/${ch + 1}">التالي</a>` : ""}</span></div>
-  <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.map((p, i) => p ? `<img src="${esc(p)}" alt="" loading="lazy">` : `<div class="page" style="background:${grad(w.title + ch, (i + 1) * 40)}">صفحة ${i + 1}<small>ضع صور الفصل في data.js</small></div>`).join("")}</div>
+  <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="reader-empty"><b>الفصل منشور ببياناته، لكن الصور لم تُرفع بعد.</b><p>هنضيف الصفحات هنا بعد رفعها من لوحة الإدارة.</p></div>`}</div>
   <div class="rend"><p>نهاية الفصل ${ch}</p>${ch < w.chapters ? `<a class="cta" href="#/r/${slug(w)}/${ch + 1}">الفصل التالي ←</a>` : `<p>وصلت لآخر فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
   <div class="rbar"><span>${ch > 1 ? `<a href="#/r/${slug(w)}/${ch - 1}">السابق</a>` : ""}${ch < w.chapters ? `<a href="#/r/${slug(w)}/${ch + 1}">التالي</a>` : ""}</span></div>`;
 }
@@ -96,7 +94,15 @@ function readerInit(w, ch) {
   const z = (d) => { const v = Math.max(360, Math.min(1200, store.get("zoom", 760) + d)); store.set("zoom", v); document.querySelector(".pages").style.maxWidth = v + "px"; };
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
   const pageBox = document.querySelector(".pages");
-  if (pageBox && window.GALAXITE_DB_CATALOG) window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch).then((urls) => { if (urls.length && pageBox.isConnected) pageBox.innerHTML = urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy">`).join(""); });
+  if (pageBox && window.GALAXITE_DB_CATALOG) {
+    pageBox.innerHTML = '<div class="reader-empty"><b>جارٍ تحميل صفحات الفصل...</b></div>';
+    window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch).then((urls) => {
+      if (!pageBox.isConnected) return;
+      pageBox.innerHTML = urls.length
+        ? urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy">`).join("")
+        : '<div class="reader-empty"><b>الفصل منشور ببياناته، لكن الصور لم تُرفع بعد.</b><p>هنضيف الصفحات هنا بعد رفعها من لوحة الإدارة.</p></div>';
+    });
+  }
   window.onscroll = () => { const m = document.documentElement.scrollHeight - innerHeight; const b = $("#pg"); if (b) b.style.width = (m > 0 ? Math.min(100, scrollY / m * 100) : 0) + "%"; else window.onscroll = null; };
 }
 function listPage(title, items, empty, chips) {
@@ -133,10 +139,22 @@ document.addEventListener("error", (e) => {
   const t = e.target;
   if (t.tagName === "IMG" && !t.dataset.f) { t.dataset.f = 1; const d = document.createElement("div"); d.className = t.className + " page"; d.style.background = "#272a36"; d.textContent = "تعذر تحميل الصورة"; t.replaceWith(d); }
 }, true);
+function catalogUnavailable() {
+  const state = window.GALAXITE_CATALOG_STATE || { status: "loading" };
+  if (state.status === "loading") {
+    $("#app").innerHTML = '<div class="empty"><h2>جارٍ تحميل مكتبة Galaxite</h2><p>بنحمّل الأعمال والفصول من قاعدة البيانات.</p></div>';
+  } else if (state.status === "error") {
+    $("#app").innerHTML = '<div class="empty"><h2>مكتبة الأعمال غير متاحة حاليًا</h2><p>تعذر الاتصال بقاعدة البيانات. جرّب إعادة التحميل.</p><button class="cta" id="retryCatalog">إعادة المحاولة</button></div>';
+    $("#retryCatalog").onclick = () => window.GALAXITE_DB_CATALOG?.refresh();
+  } else {
+    $("#app").innerHTML = '<div class="empty"><h2>لسه مفيش أعمال منشورة</h2><p>الأعمال هتظهر هنا بعد نشرها من لوحة الإدارة.</p></div>';
+  }
+}
 function route() {
   const p = location.hash.slice(2).split("/");
   window.scrollTo(0, 0);
   document.title = "Galaxite | مانجا ومانهوا";
+  if (!WORKS.length && !["login", "profile", "store"].includes(p[0])) return catalogUnavailable();
   const w = p[1] && byTitle(decodeURIComponent(p[1]));
   if ((p[0] === "s" || p[0] === "r") && !w) return notFound();
   if (p[0] === "s" && w) { document.title = w.title + " | Galaxite"; return series(w); }
@@ -171,6 +189,7 @@ function applyTheme() { document.body.classList.toggle("light", light); $("#them
 $("#theme").onclick = () => { light = !light; store.set("light", light); applyTheme(); };
 window.addEventListener("hashchange", route);
 window.addEventListener("galaxite:catalog-updated", route);
+window.addEventListener("galaxite:catalog-state", () => { if (!WORKS.length) catalogUnavailable(); });
 applyTheme();
 $("#app").innerHTML = `<div class="skel hero"></div><div class="row">${"<div class='card'><div class='cover skel'></div></div>".repeat(8)}</div>`;
 setTimeout(route, 350);
