@@ -96,7 +96,7 @@ function series(w) {
     <label for="myWorkRating">قيّم العمل من 1 إلى 10</label>
     <div class="rating-slider"><input id="myWorkRating" type="range" min="1" max="10" step="1" value="5"><output id="myWorkRatingValue">5 / 10</output></div>
     <button class="cta" id="saveWorkRating" type="button">حفظ تقييمي</button>
-    <small id="workRatingNote">كل حساب يقدر يضيف تقييمًا واحدًا للعمل.</small>
+    <small id="workRatingNote">رأيك يهمّ القرّاء.</small>
   </section>
   <h3 class="h">الفصول المتاحة (${chapters.length})</h3>
   <div class="ctl"><input id="sq" type="search" placeholder="ابحث برقم أو اسم الفصل..." value="${esc(seriesQuery)}" aria-label="بحث في الفصول"><button id="so" class="btn">${seriesSort === "new" ? "الأحدث" : "الأقدم"}</button><button id="ma" class="btn">تحديد الكل كمقروء</button></div>
@@ -105,9 +105,16 @@ function series(w) {
     const premium = VX.premium(w, number), locked = premium && VX.locked(w, number);
     const latest = chapters[0]?.number;
     const isRead = (prog[w.title] || 0) >= number;
-    return `<a class="chr ${locked ? "lk" : ""} ${isRead ? "rd" : ""}" href="#/r/${slug(w)}/${number}"><span class="thm" style="background:${grad(w.title + number, number)}">${locked ? "🔒" : "›"}</span><span class="cn"><b>${esc(chapter.title || ("الفصل " + number))}</b><small>${number === latest ? '<em class="new">● جديد</em>' : "فصل منشور"}${premium ? (locked ? " · مميز" : " · مفتوح") : " · متاح"}${(prog[w.title] || 0) === number ? " · وصلت هنا" : ""}</small></span>${locked ? `<span class="price">${VX.coin}<b>${VX.LOCK_COST}</b></span>` : premium ? `<span class="price ok">مفتوح</span>` : `<span class="price ok">متاح</span>`}</a>`;
+    return `<div class="chr ${locked ? "lk" : ""} ${isRead ? "rd" : ""}">
+      <a class="chapter-main" href="#/r/${slug(w)}/${number}">
+        <span class="thm" style="background:${grad(w.title + number, number)}">${w.cover ? `<img class="chapter-thumb" src="${esc(w.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : locked ? "🔒" : "›"}</span>
+        <span class="cn"><b>${esc(chapter.title || ("الفصل " + number))}</b><small>${number === latest ? '<em class="new">● جديد</em>' : "فصل منشور"}${premium ? (locked ? " · مميز" : " · مفتوح") : ""}${(prog[w.title] || 0) === number ? " · وصلت هنا" : ""}</small></span>
+      </a>
+      ${locked ? `<span class="price">${VX.coin}<b>${VX.LOCK_COST}</b></span>` : `<span class="chapter-end">${premium ? `<span class="price ok">مفتوح</span>` : ""}<button class="chapter-heart" type="button" data-chapter-id="${esc(chapter.id || "")}" aria-label="أعجبني الفصل ${number}" aria-pressed="false"><span class="chapter-heart-icon" aria-hidden="true">♡</span><b class="chapter-heart-count">0</b></button></span>`}
+    </div>`;
   }).join("")}</div>${chapterList.length > visible.length ? `<button class="cta alt" id="more" style="margin-top:12px">عرض المزيد (${chapterList.length - visible.length})</button>` : showAll && chapterList.length > 40 ? `<button class="cta alt" id="more" style="margin-top:12px">عرض أقل</button>` : chapters.length ? "" : '<p class="empty">لسه مفيش فصول منشورة للعمل ده.</p>'}`;
   window.GALAXITE_ENGAGEMENT?.bindWorkRating?.(w);
+  window.GALAXITE_ENGAGEMENT?.bindChapterListHearts?.(visible);
   if ($("#sq")) $("#sq").oninput = (e) => { seriesQuery = e.target.value; const p = e.target.selectionStart; series(w); const n = $("#sq"); n.focus(); n.setSelectionRange(p, p); };
   if ($("#so")) $("#so").onclick = () => { seriesSort = seriesSort === "new" ? "old" : "new"; series(w); };
   if ($("#ma")) $("#ma").onclick = () => { if (chapters.length) prog[w.title] = chapters[0].number; store.set("prog", prog); series(w); };
