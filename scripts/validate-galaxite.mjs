@@ -1,0 +1,111 @@
+#!/usr/bin/env node
+import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const IGNORE_DIRS = new Set([".git", "node_modules", ".next", "dist", "build"]);
+const errors = [];
+
+function walk(dir) {
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!IGNORE_DIRS.has(entry.name)) found.push(...walk(fullPath));
+    } else if (entry.isFile()) {
+      found.push(fullPath);
+    }
+  }
+  return found;
+}
+function fail(message) { errors.push(message); }
+function infoPath(file) { return relative(ROOT, file).split(sep).join("/"); }
+function attr(tag, name) {
+  const pattern = "\\b" + name + "\\s*=\\s*(?:\"([^\"]+)\"|'([^']+)'|([^\\s>]+))";
+  const match = tag.match(new RegExp(pattern, "i"));
+  return match ? (match[1] || match[2] || match[3] || "") : "";
+}
+function localTarget(htmlPath, raw) {
+  const value = raw.trim();
+  if (!value || /^(?:[a-z][a-z0-9+.-]*:|\\/\\/|#)/i.test(value)) return null;
+  const clean = decodeURIComponent(value.split(/[?#]/, 1)[0]);
+  if (!clean) return null;
+  return clean.startsWith("/")
+    ? resolve(ROOT, "." + clean)
+    : resolve(dirname(htmlPath), clean);
+}
+
+const files = walk(ROOT);
+const jsFiles = files.filter((file) => extname(file).toLowerCase() === ".js" || file.endsWith(".mjs"));
+const htmlFiles = files.filter((file) => extname(file).toLowerCase() === ".html");
+
+for (const file of jsFiles) {
+  const result = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
+  if (result.status !== 0) fail("JavaScript syntax: " + infoPath(file) + "\\n" + (result.stderr || result.stdout || "node --check failed"));
+}
+
+for (const file of htmlFiles) {
+  const html = readFileSync(file, "utf8");
+  const scriptTags = [...html.matchAll(/<script\\b[^>]*>/gi)].map((match) => match[0]);
+  const seenScripts = new Set();
+  for (const tag of scriptTags) {
+    const src = attr(tag, "src");
+    const target = localTarget(file, src);
+    if (!target) continue;
+    if (seenScripts.has(target)) fail("Duplicate script reference in " + infoPath(file) + ": " + src);
+    seenScripts.add(target);
+    if (!existsSync(target)) fail("Missing script in " + infoPath(file) + ": " + src);
+  }
+
+  const linkTags = [...html.matchAll(/<link\\b[^>]*>/gi)].map((match) => match[0]);
+  for (const tag of linkTags) {
+    const rel = attr(tag, "rel").toLowerCase().split(/\\s+/);
+    if (!rel.includes("stylesheet")) continue;
+    const href = attr(tag, "href");
+    const target = localTarget(file, href);
+    if (target && !existsSync(target)) fail("Missing stylesheet in " + infoPath(file) + ": " + href);
+  }
+}
+
+const requiredScripts = {
+  "index.html": ["auth-config.js", "account.js", "reports.js", "catalog.js", "app.js"],
+  "admin.html": ["auth-config.js", "reports.js", "admin.js"]
+};
+for (const [htmlName, required] of Object.entries(requiredScripts)) {
+  const file = resolve(ROOT, htmlName);
+  if (!existsSync(file)) {
+    fail("Missing required HTML entry point: " + htmlName);
+    continue;
+  }
+  const html = readFileSync(file, "utf8");
+  for (const script of required) {
+    if (!html.includes('src="' + script + '"') && !html.includes("src='" + script + "'")) {
+      fail(htmlName + " does not include required script " + script);
+    }
+  }
+}
+
+for (const file of jsFiles) {
+  const source = readFileSync(file, "utf8");
+  const relativeName = infoPath(file);
+  if (/\\bsb_secret_[A-Za-z0-9_-]{12,}/i.test(source)) fail("Potential Supabase secret key in " + relativeName);
+  if (/SERVICE_ROLE_KEY\\s*[:=]\\s*["'][^"']{20,}/i.test(source)) fail("Potential service-role secret in " + relativeName);
+  if (/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(source)) fail("Private key material found in " + relativeName);
+}
+
+const manifest = resolve(ROOT, "manifest.webmanifest");
+if (existsSync(manifest)) {
+  try { JSON.parse(readFileSync(manifest, "utf8")); }
+  catch (error) { fail("Invalid manifest.webmanifest JSON: " + error.message); }
+}
+
+if (errors.length) {
+  console.error("Galaxite validation failed:");
+  for (const error of errors) console.error("\\n- " + error);
+  process.exitCode = 1;
+} else {
+  console.log("Galaxite validation passed.");
+  console.log("Checked " + jsFiles.length + " JavaScript files, " + htmlFiles.length + " HTML entry points, local assets, required scripts, public secret patterns, and manifest JSON.");
+}

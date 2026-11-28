@@ -1,6 +1,6 @@
 /* لوحة إدارة تجريبية. مهم: لا يوجد أمان حقيقي في موقع ثابت. */
-const CFG = window.AUTH_CONFIG || { provider: "demo", ownerEmail: "ownermail@gmail.com" };
-const OWNER_EMAIL = CFG.ownerEmail; // في الوضع التجريبي للعرض فقط. مع Firebase/Supabase يُفرض فعلا
+const CFG = window.AUTH_CONFIG || { provider: "demo" };
+const OWNER_EMAIL = CFG.ownerEmail || ""; // Firebase fallback only; Supabase owner access is role-based.
 const KEY_WORKS = "vx-works", KEY_AUTH = "vx-admin-auth", KEY_SESSION = "vx-admin-session";
 const $ = (s) => document.querySelector(s);
 const root = $("#root");
@@ -62,11 +62,11 @@ async function initSdk(p) {
   }
   return sdk;
 }
-const isOwner = (e) => (e || "").toLowerCase() === OWNER_EMAIL.toLowerCase();
+const isFirebaseOwner = (e) => Boolean(OWNER_EMAIL) && (e || "").toLowerCase() === OWNER_EMAIL.toLowerCase();
 function realGate(p, msg) {
   root.innerHTML = `<div class="gate"><form class="box" id="gf">
     <div class="logo">◢ لوحة الإدارة</div><p style="color:var(--mut);margin:6px 0 0">تسجيل الدخول عبر ${p === "firebase" ? "Firebase" : "Supabase"}</p>
-    <label for="em">البريد</label><input id="em" type="email" required value="${esc(OWNER_EMAIL)}" autocomplete="username">
+    <label for="em">البريد</label><input id="em" type="email" required value="${p === "firebase" ? esc(OWNER_EMAIL) : ""}" placeholder="${p === "supabase" ? "البريد المرتبط بحساب المالك" : ""}" autocomplete="username">
     <label for="pw">كلمة المرور</label><span class="admin-pw"><input id="pw" type="password" required autocomplete="current-password"><button class="admin-pw-toggle" id="pw-toggle" type="button" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.1 0 2.1-.2 3-.5"/></svg></button></span>
     <div class="err" id="ge" role="alert">${esc(msg || "")}</div>
     <button class="btn pri" style="width:100%;justify-content:center;margin-top:8px">دخول</button>
@@ -77,27 +77,20 @@ function realGate(p, msg) {
     e.preventDefault();
     try {
       const s = await initSdk(p); const mail = await s.signIn($("#em").value.trim(), $("#pw").value);
-      if (!isOwner(mail)) { await s.signOut(); $("#ge").textContent = "هذا الحساب غير مسموح له بالدخول."; return; }
+      if (p === "firebase" && !isFirebaseOwner(mail)) {
+        await s.signOut(); $("#ge").textContent = "هذا الحساب غير مسموح له بالدخول."; return;
+      }
       if (p === "supabase") {
-        const { data: allowed, error: roleError } = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_admin");
-        if (roleError || allowed !== true) { await s.signOut(); $("#ge").textContent = "الحساب مسجل، لكن صلاحية المالك لم تُفعّل له في قاعدة البيانات بعد. تأكد من البريد أولًا."; return; }
+        const { data: allowed, error: roleError } = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_owner");
+        if (roleError || allowed !== true) {
+          await s.signOut(); $("#ge").textContent = "هذا الحساب لا يحمل صلاحية Owner في قاعدة بيانات Galaxite."; return;
+        }
       }
       if (p === "supabase") await loadWorksFromDatabase();
       sessionStorage.setItem(KEY_SESSION, "1"); render();
     } catch (error) {
       if (p === "supabase" && (error?.code === "email_not_confirmed" || /email not confirmed|confirm your email/i.test(error?.message || ""))) {
-        $("#ge").innerHTML = 'البريد الإلكتروني لم يتم تأكيده بعد. <button type="button" class="btn sm" id="resendOwnerConfirm">إعادة إرسال رسالة التأكيد</button>';
-        $("#resendOwnerConfirm").onclick = async () => {
-          const email = $("#em").value.trim();
-          if (!isOwner(email)) { $("#ge").textContent = "هذا الحساب غير مسموح له بالدخول."; return; }
-          const button = $("#resendOwnerConfirm"); button.disabled = true;
-          try {
-            const { error: resendError } = await window.GALAXITE_SUPABASE_CLIENT.auth.resend({ type: "signup", email });
-            $("#ge").textContent = resendError ? (resendError.message || "تعذر إرسال رسالة التأكيد.") : "تم طلب إرسال رسالة التأكيد. افحص البريد الوارد والرسائل غير المرغوب فيها.";
-          } catch (resendError) {
-            $("#ge").textContent = resendError?.message || "تعذر إرسال رسالة التأكيد.";
-          } finally { button.disabled = false; }
-        };
+        $("#ge").textContent = "البريد المستخدم غير مؤكد في Supabase. استخدم حساب Owner مؤكدًا أو اربط حسابك ببريد يمكنك الوصول إليه.";
       } else {
         $("#ge").textContent = error?.message || "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات.";
       }
@@ -163,7 +156,7 @@ function render() {
     <div class="sp"></div>
     <a href="index.html" class="nav">${ic("works")}<span>الموقع</span></a>
     <button class="nav" id="out">${ic("settings")}<span>خروج</span></button>
-  </nav><main class="main"><div class="top"><h1>${titles[view]}</h1><span class="pill" dir="ltr">${esc(OWNER_EMAIL)}</span></div><div id="v"></div></main></div>`;
+  </nav><main class="main"><div class="top"><h1>${titles[view]}</h1><span class="pill">Owner · Supabase</span></div><div id="v"></div></main></div>`;
   $("#out").onclick = async () => { sessionStorage.removeItem(KEY_SESSION); try { if (sdk) await sdk.signOut(); } catch {} gate(); };
   ({ dash, works: worksView, chapters: chaptersView, sources: sourcesView, users: usersView, sales: salesView, community: communityView, promo: promoView, settings })[view]();
 }
@@ -677,7 +670,7 @@ function settings() {
       <p style="color:var(--mut);line-height:1.9;margin:0">الأعمال والفصول وبلاغات المحتوى تُحفظ مركزيًا في قاعدة البيانات والتخزين، وأي تعديل ناجح يظهر للمستخدمين بعد تحديث الموقع. لا تعتمد هذه اللوحة على تصدير data.js لحفظ التعديلات.</p>
     </div>
     <div class="panel"><h2>الحساب والأمان</h2>
-      <p style="margin:0 0 12px">حساب المالك: <b dir="ltr">${esc(OWNER_EMAIL)}</b></p>
+      <p style="margin:0 0 12px">صلاحية المالك: <b>يتم تحديدها من دور Owner في قاعدة البيانات.</b></p>
       <label for="np">كلمة مرور جديدة (٨ أحرف على الأقل)</label>
       <div class="acts"><input id="np" type="password" minlength="8" autocomplete="new-password" style="flex:1;min-width:200px"><button class="btn pri" id="cpw">تغيير كلمة المرور</button></div>
       <div class="err" id="se" role="alert"></div>
@@ -708,9 +701,14 @@ const h0 = location.hash.slice(1); if (["dash", "works", "chapters", "users", "s
   if (rp && sessionStorage.getItem(KEY_SESSION)) {
     try {
       const s = await initSdk(rp); const m = await s.current();
-      let allowed = true;
-      if (rp === "supabase" && m) { const result = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_admin"); allowed = !result.error && result.data === true; }
-      if (!isOwner(m) || !allowed) sessionStorage.removeItem(KEY_SESSION);
+      let allowed = false;
+      if (rp === "supabase" && m) {
+        const result = await window.GALAXITE_SUPABASE_CLIENT.rpc("is_owner");
+        allowed = !result.error && result.data === true;
+      } else if (rp === "firebase" && m) {
+        allowed = isFirebaseOwner(m);
+      }
+      if (!allowed) sessionStorage.removeItem(KEY_SESSION);
       else if (rp === "supabase") await loadWorksFromDatabase();
     } catch { sessionStorage.removeItem(KEY_SESSION); }
   }

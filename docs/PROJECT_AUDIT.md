@@ -4,43 +4,54 @@
 
 - The public frontend is static HTML/CSS/JavaScript and is currently published from GitHub Pages.
 - The working branch for the overhaul is `backup/pre-galaxite-overhaul-2026-11-28`. The `main` branch has not been changed by this work.
-- The current UI data source is still `data.js`; several admin screens still write to browser `localStorage` and are not yet connected to shared production data.
-- Supabase already contains a Galaxite catalog: 16 works and 3,849 chapter metadata rows.
-- `site_chapter_pages` currently contains zero rows, so the chapter metadata is not yet backed by uploaded reader page images.
-- The private `galaxite-chapters` storage bucket and reader/admin storage policies already exist.
-- Existing source discovery caches include Team-X and Azora. There is no Asura adapter in the Galaxite frontend/backend yet.
-- Existing active Edge Functions include catalog refresh and a separate download function. Their code must be reviewed before reuse; do not replace them blindly.
-- There is no OCR/image-cleanup/Arabic-typesetting worker connected to the Galaxite publishing flow yet.
+- Supabase contains 16 works and 3,849 chapter metadata rows. `site_chapter_pages` currently contains zero rows, so there are no stored reader page images yet.
+- The private `galaxite-chapters` storage bucket and reader/admin storage policies exist.
+- Source discovery caches include Team-X and Azora. No complete Asura adapter exists for Galaxite.
+- Existing active Edge Functions include `refresh-teamx-catalog` and `solo-manga-download`. Both currently report `verify_jwt=false`; their code, caller authentication, and schedules must be reviewed before reuse or launch. They were not modified in this audit.
+- No OCR/image-cleanup/Arabic-typesetting worker is connected to the Galaxite publishing flow.
 
 ## Implemented in the working branch
 
-- Moved password visibility controls to the physical left side on reader and admin login forms.
-- Added a shared Supabase-backed reporting module.
-- Added report actions on work details and chapter reader pages.
-- Added a real report inbox in the authenticated admin dashboard, with open/reviewing/resolved/dismissed states.
-- Added a live catalog loader that reads published works from Supabase and requests signed URLs for stored chapter pages when they exist.
-- Connected owner work management, chapter metadata, chapter image uploads/replacements, profile listing, and profile-role management to Supabase.
-- Added owner controls for source authorization/enablement and views for ingestion and localization job queues. All newly registered sources start disabled and pending authorization.
-- Added service-role-only atomic job-claim functions with stale-lock recovery for future ingestion and localization workers.
-- Replaced demo dashboard metrics with live catalog/page counts; payment and homepage-promotion panels now clearly show that those integrations are not active instead of presenting fake figures.
-- Added database support for `work` and `chapter` report targets, report details, target labels/paths, and lookup indexes.
-- Restricted report listing and updates to accounts for which `public.is_admin()` is true.
-- Added an owner-role check to the Supabase admin login path.
-- Added a JavaScript syntax-check workflow for the working branch.
-- Bumped the service-worker cache and added `reports.js` to its precache list.
+- Added a Supabase-backed reporting module and report inbox for work/chapter reports.
+- Added a live catalog loader for published works and signed chapter-page URLs.
+- Connected owner work management, chapter metadata, chapter image upload/replacement, profile listing/role management, source registry, and job-queue views to Supabase.
+- Added service-role-only atomic job-claim functions and stale-lock recovery for future workers.
+- Restricted reports, source registry, and queue management using database role checks and RLS policies.
+- Replaced demo dashboard metrics with live values; payment and promotion integrations are clearly marked inactive.
+- Added GitHub Actions frontend validation on the working branch.
+- Removed the obsolete Drive-import workflow from the working branch because it could replace site files and push directly to the default branch.
 
-## Important blockers before a public test
+## Owner access and email verification
 
-1. The configured owner account exists in Supabase but its email is not confirmed and its profile role is still `user`. A verified-email trigger is now in place to grant the owner role only after confirmation; the existing verified owner role is preserved as a fallback.
-2. The main owner dashboard now edits works and chapters in Supabase and can upload/replace chapter pages in the private storage bucket. These flows still need an authenticated browser end-to-end test before public rollout.
-3. The live catalog/page loader is in place, but the database currently has no chapter-page rows; reader testing with real page assets remains pending.
-4. OCR, text removal/inpainting, translation, font selection, typesetting, source adapters, scheduled discovery, and the actual worker runtime remain to be built. The database queue and secure claim functions exist, but no worker is deployed yet.
-5. Asura and any other source adapters must remain disabled for importing/republication until the required permission is obtained. Internal testing should use user-owned or authorized sample pages.
-6. Payments and homepage promotion settings are still not backed by central services and are intentionally marked inactive in the owner dashboard.
+- Supabase currently has one confirmed account with the `owner` profile role.
+- The previous admin frontend incorrectly required a hard-coded placeholder email before checking database permissions. The updated gate uses the signed-in Supabase user's `is_owner()` result as the authority; the email address itself no longer grants access.
+- The placeholder email is no longer configured as an owner and its automatic role-promotion triggers/function have been removed from Supabase. The corresponding database migration is tracked in this repository.
+- Email confirmation has not been disabled globally. Unconfirmed accounts remain subject to Supabase Auth's normal confirmation rules.
+- The login flow still needs a real browser test with the existing Owner account.
 
-## Validation
+## Supabase audit findings
 
-- The frontend JavaScript syntax workflow completed successfully on the working branch.
-- The report schema and RLS policies were queried after migration.
-- End-to-end browser testing of sign-in, report submission, image upload, and report resolution is still pending owner verification and a browser test session.
-- No changes from this branch have been merged into `main` or published to the public site.
+- The report RLS policies were inspected: signed-in users can submit reports for their own user ID; report listing and status updates require admin authority.
+- Published catalog reads and premium chapter-page access retain their intended public/subscriber checks. Do not remove anonymous read policies blindly; the frontend has public browsing routes.
+- Supabase Security Advisor reports that leaked-password protection is disabled. Enable it in Supabase Auth password-security settings before public launch.
+- Advisor warnings also include anonymous/public policy exposure and multiple permissive policies. These need table-by-table validation; the public catalog and reader paths intentionally have public reads.
+- Performance Advisor reports unindexed foreign keys and unused indexes across legacy and current tables. No bulk index removal was performed because workload evidence is needed first.
+- Database migration `20261128001346_remove_placeholder_owner_email_promotion` was applied and verified: the placeholder email promotion triggers/function are absent, and one confirmed Owner account remains.
+
+## Remaining blockers before launch
+
+1. Authenticated browser end-to-end tests for Owner login, admin access, work edits, chapter metadata, image uploads/replacements, reports, and RLS denials.
+2. Upload authorized sample chapter pages; the reader cannot display real stored pages until `site_chapter_pages` has records.
+3. Build and deploy the actual worker runtime: OCR, text-region detection, cleaning/inpainting, translation, Arabic font selection, text fitting/typesetting, and safe publishing.
+4. Build source adapters and scheduled discovery only for sources with documented permission; leave pending/unapproved sources disabled.
+5. Review both existing Edge Functions with `verify_jwt=false`, including code, schedules, and any service-role use, before enabling Galaxite automation.
+6. Enable Supabase leaked-password protection and finish Auth/RLS policy review.
+7. Take a full Supabase backup and verify a restore path; no full database backup was taken during this work.
+8. Finish payment gateway and promotion backend integrations, or keep those panels explicitly inactive.
+9. Test mobile/desktop layouts and browser console/network errors.
+10. Review remaining prototype pages and any remaining localStorage-only admin/team functions before launch.
+
+## Validation limits
+
+- The GitHub workflow performs static checks only. It does not replace browser, auth, storage, RLS, payment, OCR, or load testing.
+- No changes from the working branch have been merged into `main` or published to the public site.
