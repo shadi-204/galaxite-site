@@ -29,7 +29,7 @@ function attr(tag, name) {
 }
 function localTarget(htmlPath, raw) {
   const value = raw.trim();
-  if (!value || /^(?:[a-z][a-z0-9+.-]*:|\\/\\/|#)/i.test(value)) return null;
+  if (!value || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(value)) return null;
   const clean = decodeURIComponent(value.split(/[?#]/, 1)[0]);
   if (!clean) return null;
   return clean.startsWith("/")
@@ -43,12 +43,12 @@ const htmlFiles = files.filter((file) => extname(file).toLowerCase() === ".html"
 
 for (const file of jsFiles) {
   const result = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
-  if (result.status !== 0) fail("JavaScript syntax: " + infoPath(file) + "\\n" + (result.stderr || result.stdout || "node --check failed"));
+  if (result.status !== 0) fail("JavaScript syntax: " + infoPath(file) + "\n" + (result.stderr || result.stdout || "node --check failed"));
 }
 
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
-  const scriptTags = [...html.matchAll(/<script\\b[^>]*>/gi)].map((match) => match[0]);
+  const scriptTags = [...html.matchAll(/<script\b[^>]*>/gi)].map((match) => match[0]);
   const seenScripts = new Set();
   for (const tag of scriptTags) {
     const src = attr(tag, "src");
@@ -59,9 +59,9 @@ for (const file of htmlFiles) {
     if (!existsSync(target)) fail("Missing script in " + infoPath(file) + ": " + src);
   }
 
-  const linkTags = [...html.matchAll(/<link\\b[^>]*>/gi)].map((match) => match[0]);
+  const linkTags = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
   for (const tag of linkTags) {
-    const rel = attr(tag, "rel").toLowerCase().split(/\\s+/);
+    const rel = attr(tag, "rel").toLowerCase().split(/\s+/);
     if (!rel.includes("stylesheet")) continue;
     const href = attr(tag, "href");
     const target = localTarget(file, href);
@@ -90,8 +90,8 @@ for (const [htmlName, required] of Object.entries(requiredScripts)) {
 for (const file of jsFiles) {
   const source = readFileSync(file, "utf8");
   const relativeName = infoPath(file);
-  if (/\\bsb_secret_[A-Za-z0-9_-]{12,}/i.test(source)) fail("Potential Supabase secret key in " + relativeName);
-  if (/SERVICE_ROLE_KEY\\s*[:=]\\s*["'][^"']{20,}/i.test(source)) fail("Potential service-role secret in " + relativeName);
+  if (/\bsb_secret_[A-Za-z0-9_-]{12,}/i.test(source)) fail("Potential Supabase secret key in " + relativeName);
+  if (/SERVICE_ROLE_KEY\s*[:=]\s*["'][^"']{20,}/i.test(source)) fail("Potential service-role secret in " + relativeName);
   if (/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(source)) fail("Private key material found in " + relativeName);
 }
 
@@ -103,7 +103,7 @@ if (existsSync(manifest)) {
 
 if (errors.length) {
   console.error("Galaxite validation failed:");
-  for (const error of errors) console.error("\\n- " + error);
+  for (const error of errors) console.error("\n- " + error);
   process.exitCode = 1;
 } else {
   console.log("Galaxite validation passed.");
