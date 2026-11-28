@@ -230,36 +230,48 @@
   }
 
   async function getChapterPages(workId, chapterNumber) {
-    try {
-      const db = await getClient();
-      if (!db) return [];
-      const { data: chapter, error: chapterError } = await db.from("site_chapters")
-        .select("id,is_published")
-        .eq("work_id", String(workId))
-        .eq("chapter_number", Number(chapterNumber))
-        .maybeSingle();
-      if (chapterError || !chapter?.is_published) return [];
+    const db = await getClient();
+    if (!db) throw new Error("Supabase client unavailable.");
 
-      const { data: pages, error: pagesError } = await db.from("site_chapter_pages")
-        .select("page_number,storage_path,image_url")
-        .eq("chapter_id", chapter.id)
-        .order("page_number", { ascending: true });
-      if (pagesError || !Array.isArray(pages) || !pages.length) return [];
+    const { data: chapter, error: chapterError } = await db.from("site_chapters")
+      .select("id,is_published")
+      .eq("work_id", String(workId))
+      .eq("chapter_number", Number(chapterNumber))
+      .maybeSingle();
+    if (chapterError) throw chapterError;
+    if (!chapter?.is_published) throw new Error("Chapter is not published.");
 
-      const resolved = await Promise.all(pages.map(async (page) => {
-        if (page.image_url) return { page: page.page_number, url: page.image_url };
-        if (!page.storage_path) return null;
-        const { data, error } = await db.storage.from("galaxite-chapters")
-          .createSignedUrl(page.storage_path, 3600);
-        return error ? null : { page: page.page_number, url: data?.signedUrl || "" };
-      }));
-      return resolved.filter((item) => item?.url)
-        .sort((a, b) => a.page - b.page)
-        .map((item) => item.url);
-    } catch (error) {
-      console.warn("Chapter pages unavailable.", error);
-      return [];
+    const { data, error } = await db.functions.invoke("refresh-chapter-images", {
+      body: { chapterId: chapter.id }
+    });
+    if (error) throw error;
+    if (Array.isArray(data?.urls) && data.urls.length) return data.urls;
+
+    // Another visitor may already be refreshing this chapter. Briefly poll
+    // the public page metadata instead of showing a false "not updated" state.
+    if (data?.pending) {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const { data: pages, error: pagesError } = await db.from("site_chapter_pages")
+          .select("page_number,image_url,storage_path")
+          .eq("chapter_id", chapter.id)
+          .order("page_number", { ascending: true });
+        if (pagesError) throw pagesError;
+        const resolved = await Promise.all((pages || []).map(async (page) => {
+          if (page.image_url) return { page: page.page_number, url: page.image_url };
+          if (!page.storage_path) return null;
+          const { data: signed, error: signedError } = await db.storage
+            .from("galaxite-chapters").createSignedUrl(page.storage_path, 3600);
+          return signedError ? null : { page: page.page_number, url: signed?.signedUrl || "" };
+        }));
+        const urls = resolved.filter((item) => item?.url)
+          .sort((a, b) => a.page - b.page).map((item) => item.url);
+        if (urls.length) return urls;
+      }
     }
+
+    if (data?.error) throw new Error(data.error);
+    return [];
   }
 
   window.GALAXITE_DB_CATALOG = {
