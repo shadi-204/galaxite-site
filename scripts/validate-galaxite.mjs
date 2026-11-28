@@ -95,6 +95,40 @@ for (const file of jsFiles) {
   if (/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(source)) fail("Private key material found in " + relativeName);
 }
 
+const serviceWorker = resolve(ROOT, "sw.js");
+if (!existsSync(serviceWorker)) {
+  fail("Missing service worker: sw.js");
+} else {
+  const worker = readFileSync(serviceWorker, "utf8");
+  const filesMatch = worker.match(/const\\s+FILES\\s*=\\s*\\[([\\s\\S]*?)\\]\\s*;/);
+  if (!filesMatch) {
+    fail("Could not read the service worker precache file list.");
+  } else {
+    try {
+      const assets = JSON.parse("[" + filesMatch[1] + "]");
+      for (const asset of assets) {
+        if (typeof asset !== "string") {
+          fail("Service worker precache entries must be string paths.");
+          continue;
+        }
+        const target = localTarget(resolve(ROOT, "index.html"), asset);
+        if (target && !existsSync(target)) fail("Missing service worker precache asset: " + asset);
+      }
+    } catch (error) {
+      fail("Invalid service worker precache list: " + error.message);
+    }
+  }
+  if (!/request\\.mode\\s*===\\s*["']navigate["']/.test(worker)) {
+    fail("Service worker must use index.html fallback only for navigation requests.");
+  }
+  if (!/key\\.startsWith\\(CACHE_PREFIX\\)/.test(worker)) {
+    fail("Service worker cache cleanup must be limited to the Galaxite cache prefix.");
+  }
+  if (!/response\\.ok/.test(worker)) {
+    fail("Service worker must not cache failed HTTP responses.");
+  }
+}
+
 const manifest = resolve(ROOT, "manifest.webmanifest");
 if (existsSync(manifest)) {
   try { JSON.parse(readFileSync(manifest, "utf8")); }
