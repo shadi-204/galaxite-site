@@ -602,12 +602,32 @@ document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => {
 function applyTheme() { document.body.classList.toggle("light", light); $("#theme").innerHTML = light ? `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 13A9 9 0 1111 3a7 7 0 0010 10z"/></svg>` : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`; }
 $("#theme").onclick = () => { light = !light; store.set("light", light); applyTheme(); };
 window.addEventListener("hashchange", route);
-window.addEventListener("galaxite:catalog-updated", route);
+
+let catalogViewRefreshTimer = 0;
+function refreshCatalogViewWithoutReload() {
+  if (catalogViewRefreshTimer) clearTimeout(catalogViewRefreshTimer);
+  catalogViewRefreshTimer = setTimeout(() => {
+    catalogViewRefreshTimer = 0;
+    const parts = location.hash.slice(2).split("/");
+    const page = parts[0] || "";
+    if (!["", "lib", "b"].includes(page)) return;
+    if (!WORKS.length) return route();
+
+    const currentScroll = window.scrollY || 0;
+    if (page === "lib") {
+      library();
+    } else if (page === "b") {
+      listPage("المفضلة", marks.map(byTitle).filter(Boolean), "لسه ما أضفتش حاجة. افتح أي عمل واضغط ☆ أضف للمفضلة.");
+    } else {
+      home();
+    }
+    post(parts);
+    requestAnimationFrame(() => window.scrollTo(0, currentScroll));
+  }, 280);
+}
+window.addEventListener("galaxite:catalog-updated", refreshCatalogViewWithoutReload);
 window.addEventListener("galaxite:catalog-state", () => { if (!WORKS.length) catalogUnavailable(); });
-window.addEventListener("galaxite:ratings-updated", () => {
-  const page = location.hash.slice(2).split("/")[0];
-  if (["", "lib", "browse", "cats"].includes(page)) route();
-});
+window.addEventListener("galaxite:ratings-updated", refreshCatalogViewWithoutReload);
 window.addEventListener("galaxite:work-chapters-updated", (event) => {
   const parts = location.hash.slice(2).split("/");
   if (!["s", "r"].includes(parts[0])) return;
