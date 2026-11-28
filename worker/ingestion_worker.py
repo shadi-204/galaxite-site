@@ -15,6 +15,8 @@ import time
 import uuid
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
+
+from asura_adapter import parse_listing, parse_detail, parse_chapter
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -147,7 +149,89 @@ def _source_manifest(source: dict[str, Any]) -> tuple[dict[str, Any], str]:
     return manifest, urlparse(base).hostname or ""
 
 
+def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
+    """Discover one Asura browse page per job to keep each run bounded."""
+    page = max(1, int((job.get("payload") or {}).get("page") or 1))
+    max_pages = max(1, min(30, int(os.getenv("ASURA_BROWSE_PAGES", "22"))))
+    browse_url = f"https://asurascans.com/browse?page={page}"
+    raw, _ = _request(browse_url, {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
+    listings = parse_listing(raw.decode("utf-8", "replace"), browse_url)
+    initial_chapters = max(0, min(10, int(os.getenv("ASURA_INITIAL_CHAPTERS", "3"))))
+    for entry in listings:
+        detail_raw, _ = _request(entry["url"], {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
+        detail = parse_detail(detail_raw.decode("utf-8", "replace"), entry["url"])
+        title = detail["title"] or entry["title"]
+        if not title:
+            continue
+        existing = supabase.rows("site_works", "select=id&title=eq." + __import__("urllib.parse", fromlist=["quote"]).quote(title, safe="") + "&limit=1")
+        fields = {
+            "title": title[:300], "type": "manhwa", "genres": detail["genres"],
+            "description": detail["description"], "cover_url": detail["cover_url"],
+            "chapter_count": len(detail["chapters"]), "rating": 0,
+            "status": "مستمر", "sort_order": 0, "is_published": False,
+        }
+        if existing:
+            work_id = existing[0]["id"]
+            supabase.update("site_works", "id=eq." + work_id, fields)
+        else:
+            work_id = supabase.insert("site_works", fields)["id"]
+        chapters = detail["chapters"]
+        selected_for_download = set(x["number"] for x in chapters[-initial_chapters:]) if initial_chapters else set()
+        for chapter in chapters:
+            number = chapter["number"]
+            query = f"select=id&work_id=eq.{work_id}&chapter_number=eq.{number}&limit=1"
+            found = supabase.rows("site_chapters", query)
+            chapter_fields = {"work_id": work_id, "chapter_number": number,
+                              "title": chapter["title"][:300] or None, "is_published": False}
+            if found:
+                chapter_id = found[0]["id"]
+            else:
+                chapter_id = supabase.insert("site_chapters", chapter_fields)["id"]
+            if number in selected_for_download:
+                prior = supabase.rows(
+                    "site_ingestion_jobs",
+                    f"select=id&external_chapter_id=eq.{chapter_id}&job_type=eq.fetch_asura_chapter&status=in.(queued,running,completed)&limit=1",
+                )
+                if not prior:
+                    supabase.insert("site_ingestion_jobs", {
+                        "source_id": source["id"], "job_type": "fetch_asura_chapter",
+                        "external_work_id": str(work_id), "external_chapter_id": str(chapter_id),
+                        "payload": {"chapter_url": chapter["url"], "source_host": "asurascans.com",
+                                    "allowed_image_hosts": ["cdn.asurascans.com"]},
+                    })
+    # Queue the next browse page separately; this avoids one very long job.
+    if listings and page < max_pages:
+        pending = supabase.rows(
+            "site_ingestion_jobs",
+            f"select=id&source_id=eq.{source['id']}&job_type=eq.discover_works&status=in.(queued,running)&limit=2",
+        )
+        if len(pending) <= 1:
+            supabase.insert("site_ingestion_jobs", {
+                "source_id": source["id"], "job_type": "discover_works",
+                "payload": {"page": page + 1, "trigger": "asura_pagination"},
+            })
+    supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {
+        "status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(),
+        "last_error": None, "locked_at": None, "locked_by": None,
+    })
+
+
+def _fetch_asura_chapter(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
+    payload = job.get("payload") or {}
+    chapter_url = str(payload.get("chapter_url") or "")
+    if urlparse(_https_url(chapter_url)).hostname != "asurascans.com":
+        raise WorkerError("Chapter page must be on the configured Asura host.")
+    raw, _ = _request(chapter_url, {"Accept": "text/html"}, max_bytes=8 * 1024 * 1024)
+    page_urls = parse_chapter(raw.decode("utf-8", "replace"), chapter_url)
+    if not page_urls:
+        raise WorkerError("No public chapter page images were found; chapter may require access or page markup may have changed.")
+    payload["page_urls"] = page_urls
+    _fetch_chapter(supabase, source, {**job, "payload": payload})
+
+
 def _discover(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
+    if source.get("adapter_key") == "asura_scans":
+        return _discover_asura(supabase, source, job)
     manifest, _ = _source_manifest(source)
     for item in manifest["works"]:
         title = str(item["title"]).strip()[:300]
@@ -197,16 +281,17 @@ def _fetch_chapter(supabase: Supabase, source: dict[str, Any], job: dict[str, An
     host = urlparse(str(source.get("base_url") or "")).hostname
     if not isinstance(urls, list) or not urls or len(urls) > 200:
         raise WorkerError("Chapter job has no valid page_urls list.")
+    allowed_hosts = set(payload.get("allowed_image_hosts") or [host])
     if payload.get("source_host") != host:
-        raise WorkerError("Chapter URLs do not match the authorized source host.")
+        raise WorkerError("Chapter URLs do not match the configured source host.")
     chapter_id = job.get("external_chapter_id")
     if not chapter_id:
         raise WorkerError("Chapter job is missing its chapter ID.")
     bucket = os.getenv("SUPABASE_CHAPTERS_BUCKET", "galaxite-chapters")
     page_rows = []
     for index, page_url in enumerate(urls, 1):
-        if urlparse(_https_url(str(page_url))).hostname != host:
-            raise WorkerError("Page URL host does not match the authorized feed host.")
+        if urlparse(_https_url(str(page_url))).hostname not in allowed_hosts:
+            raise WorkerError("Page URL host is not in the source adapter allowlist.")
         content, mime = _request(str(page_url), max_bytes=MAX_PAGE_BYTES)
         if mime not in ALLOWED_IMAGE_TYPES:
             raise WorkerError(f"Page {index} is not a supported image.")
@@ -232,7 +317,7 @@ def schedule_discovery(supabase: Supabase) -> None:
     """Queue periodic discovery for each enabled, authorized JSON feed."""
     sources = supabase.rows(
         "site_content_sources",
-        "select=id,adapter_key,enabled,authorization_status,poll_interval_minutes&enabled=eq.true&authorization_status=eq.authorized&adapter_key=eq.galaxite_json_feed",
+        "select=id,adapter_key,enabled,authorization_status,poll_interval_minutes&enabled=eq.true&authorization_status=eq.authorized&adapter_key=in.(galaxite_json_feed,asura_scans)",
     )
     now = datetime.now(timezone.utc)
     for source in sources:
@@ -268,6 +353,8 @@ def process_one(supabase: Supabase, worker_id: str) -> bool:
             _discover(supabase, source, job)
         elif job["job_type"] == "fetch_chapter":
             _fetch_chapter(supabase, source, job)
+        elif job["job_type"] == "fetch_asura_chapter" and source.get("adapter_key") == "asura_scans":
+            _fetch_asura_chapter(supabase, source, job)
         else:
             raise WorkerError(f"Job type {job['job_type']} is not implemented by this worker.")
     except Exception as exc:
