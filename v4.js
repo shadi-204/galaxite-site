@@ -58,13 +58,13 @@ function rankBlock(el) {
   const draw = () => {
     const K = { d: ["الأعلى تقييمًا"] };
     const l = [...WORKS].sort((a, b) => pop(b) - pop(a)).slice(0, 8);
-    el.innerHTML = `<h3 class="h">الأكثر قراءة</h3><div class="v4tabs">${Object.entries(K).map(([k, v]) => `<button class="${per === k ? "on" : ""}" data-p="${k}">${v[0]}</button>`).join("")}</div>
+    el.innerHTML = `<h3 class="h">الأعلى تقييمًا</h3><div class="v4tabs">${Object.entries(K).map(([k, v]) => `<button class="${per === k ? "on" : ""}" data-p="${k}">${v[0]}</button>`).join("")}</div>
     <ol class="v4rank">${l.map((w, i) => `<li class="${i ? "" : "first"}"><a href="#/s/${slug(w)}"><b>${nm(i + 1)}</b><div class="v4th s">${cover(w)}</div><span dir="auto">${esc(w.title)}<small>الفصل ${nm(w.chapters)} · تقييم ${Number(w.rating || 0).toFixed(1)}</small></span></a></li>`).join("")}</ol>`;
     el.querySelectorAll("button").forEach((b) => (b.onclick = () => { per = b.dataset.p; draw(); }));
   };
   draw();
 }
-function rank() { $("#app").innerHTML = `<h2 class="v4h"><span></span>الأكثر قراءة</h2><div id="rk"></div>`; rankBlock($("#rk")); }
+function rank() { $("#app").innerHTML = `<h2 class="v4h"><span></span>الأعلى تقييمًا</h2><div id="rk"></div>`; rankBlock($("#rk")); }
 /* ---- المهام والمستويات ---- */
 const MIS = [["دخول اليوم", 1, 5], ["اقرأ 3 فصول", 3, 15], ["أضف عملا للمفضلة", 1, 10], ["اكتب تعليقا", 1, 10], ["شارك عملا", 1, 5]];
 function missions() {
@@ -87,10 +87,10 @@ function support() {
   $("#v4d").onclick = () => VX.toast("وضع تجريبي: لا دفع حقيقي", "ok");
 }
 V3.pages.browse = browse; V3.pages.cats = cats; V3.pages.latest = latest; V3.pages.rank = rank; V3.pages.missions = missions; V3.pages.support = support;
-const T = { browse: "تصفح", cats: "التصنيفات", latest: "أحدث الفصول", rank: "الأكثر قراءة", missions: "المهام", support: "ادعمنا" };
+const T = { browse: "تصفح", cats: "التصنيفات", latest: "أحدث الفصول", rank: "الأعلى تقييمًا", missions: "المهام", support: "ادعمنا" };
 addEventListener("hashchange", () => setTimeout(() => { const p = location.hash.slice(2).split("/")[0]; if (T[p]) document.title = T[p] + " | Galaxite"; }, 0));
 
-/* ---- الرئيسية: الأكثر قراءة + تصنيفات ---- */
+/* ---- الرئيسية: الأعلى تقييمًا + تصنيفات ---- */
 function enrich() {
   if (location.hash && location.hash !== "#/" && location.hash !== "#") return;
   const a = $("#app"); if (!a.querySelector(".gstrip, .row, .hero") || a.querySelector("#v4home")) return;
@@ -101,12 +101,12 @@ function enrich() {
 new MutationObserver(() => { if (!$("#v4home")) enrich(); }).observe($("#app"), { childList: true });
 
 /* ---- قائمة التنقل ---- */
-const nav = $("#mnav"); if (nav) nav.innerHTML = `<a href="#/" data-r="home">الرئيسية</a><a href="#/browse">تصفح</a><a href="#/latest">أحدث الفصول</a><a href="#/cats">التصنيفات</a><a href="#/rank">الأكثر قراءة</a><a href="#/store" data-r="store">المتجر</a><a href="#/community">المجتمع</a><a href="#/top">المتصدرين</a><a href="#/missions">المهام</a><a href="#/support">ادعمنا</a>`;
+const nav = $("#mnav"); if (nav) nav.innerHTML = `<a href="#/" data-r="home">الرئيسية</a><a href="#/browse">تصفح</a><a href="#/latest">أحدث الفصول</a><a href="#/cats">التصنيفات</a><a href="#/rank">الأعلى تقييمًا</a><a href="#/store" data-r="store">المتجر</a><a href="#/community">المجتمع</a><a href="#/top">المتصدرين</a><a href="#/missions">المهام</a><a href="#/support">ادعمنا</a>`;
 const ft = document.querySelector(".foot nav"); if (ft) ft.insertAdjacentHTML("beforeend", `<a href="#/support">ادعمنا</a>`);
 
 /* ---- كوكيز ونافذة الجديد ---- */
 if (!LS.g("v4ck", 0)) { const c = document.createElement("div"); c.className = "v4ck"; c.innerHTML = `<div><b>تجربة قراءة أفضل</b><small>نحفظ تقدمك وإعداداتك على جهازك فقط.</small></div><span><button class="cta" id="ck1">موافق</button><button class="cta alt" id="ck2">رفض</button></span>`; document.body.appendChild(c); c.querySelectorAll("button").forEach((b) => (b.onclick = () => { LS.s("v4ck", 1); c.remove(); })); }
-const NEW = [["تصفح بفلتر جانبي", "فلتر بالحالة والنوع والتصنيف."], ["الأكثر قراءة", "اليوم والأسبوع والشهر."], ["المهام والمستويات", "اجمع XP وافتح إطارات الملف."], ["لوحات للفرق", "لوحة فريق ولوحة مدير الموقع."]];
+const NEW = [["تصفح بفلتر جانبي", "فلتر بالحالة والنوع والتصنيف."], ["الأعلى تقييمًا", "اليوم والأسبوع والشهر."], ["المهام والمستويات", "اجمع XP وافتح إطارات الملف."], ["لوحات للفرق", "لوحة فريق ولوحة مدير الموقع."]];
 if (!LS.g("v4new", 0)) setTimeout(() => {
   let i = 0; const o = document.createElement("div"); o.className = "v4ov";
   const d = () => { o.innerHTML = `<div class="v4md"><small>الجديد في الموقع · ${nm(i + 1)} من ${nm(NEW.length)}</small><h3>${NEW[i][0]}</h3><p>${NEW[i][1]}</p><div><button class="cta alt" id="nx0">تخطي</button><button class="cta" id="nx1">${i == NEW.length - 1 ? "ابدأ" : "التالي"}</button></div></div>`; o.querySelector("#nx0").onclick = end; o.querySelector("#nx1").onclick = () => (++i >= NEW.length ? end() : d()); };
