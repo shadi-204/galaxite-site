@@ -59,7 +59,7 @@ async function getSdk() {
     c.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
         window.GALAXITE_PASSWORD_RECOVERY = true;
-        setTimeout(() => passwordRecoveryPage(), 0);
+        setTimeout(() => window.GALAXITE_SHOW_PASSWORD_RECOVERY?.(), 0);
       }
     });
     sdk = {
@@ -341,6 +341,7 @@ function passwordRecoveryPage() {
     }
   };
 }
+window.GALAXITE_SHOW_PASSWORD_RECOVERY = passwordRecoveryPage;
 async function finish(email, name, next) {
   mode = "in";
   if (realProvider() === "supabase") {
