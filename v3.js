@@ -284,13 +284,7 @@ const pinnedChapterLoads = new Set();
 function wcard(w, i, pin) {
   const V = window.VX;
   const hasChapterMetadata = Array.isArray(w.publishedChapters);
-  const chapterRows = (hasChapterMetadata
-    ? [...w.publishedChapters]
-    : Array.from({ length: Math.min(3, Math.max(0, Number(w.chapters) || 0)) }, (_, k) => ({
-        chapter_number: Number(w.chapters) - k,
-        title: "",
-        is_premium: false
-      })))
+  const chapterRows = hasChapterMetadata ? [...w.publishedChapters] : []
     .map((chapter) => ({
       ...chapter,
       number: Number(chapter.chapter_number ?? chapter.number)
@@ -321,8 +315,7 @@ function wcard(w, i, pin) {
     <div class="wci">
       <a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
       <div class="wm"><span>${IC.star} ${w.rating}</span><span class="st ${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</span></div>
-      ${rows || '<small class="work-source-date">لا توجد فصول منشورة مسجلة</small>'}
-      ${!hasChapterMetadata && chapterRows.length ? '<small class="work-source-date">جارٍ تحميل حالة الفصول...</small>' : ""}
+      ${hasChapterMetadata ? (rows || '<small class="work-source-date">لا توجد فصول منشورة مسجلة</small>') : ""}
     </div>
   </div>`;
 }
