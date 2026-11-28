@@ -20,24 +20,30 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check required secrets
+        id: secret_check
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             echo "::notice::Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY as repository Actions secrets before running ingestion."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
+        if: steps.secret_check.outputs.ready == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: steps.secret_check.outputs.ready == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Run one bounded ingestion batch
+        if: steps.secret_check.outputs.ready == 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
