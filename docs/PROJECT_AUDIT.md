@@ -88,3 +88,15 @@
 - Added worker/test_paddle_ocr_batch.py. GitHub Actions now runs Python syntax compilation and three unit tests in addition to frontend validation and static build.
 - Latest verified full CI build and tests: https://github.com/shadi-204/galaxite-site/actions/runs/46089234996
 - This is source code plus mocked/unit coverage only. PaddleOCR and its model weights have not been installed in a runtime; no full 88-page OCR run or accuracy benchmark has been completed.
+
+
+## Live catalog integrity and reader UX — 2026-11-28
+
+- Removed the bundled sample catalog and the browser-local `vx-works` override from the public frontend. The published catalog now comes only from `site_works` in Supabase; a database failure is shown explicitly rather than silently presenting stale sample works.
+- Added explicit loading, empty, and error states for the public catalog with a retry action.
+- Removed placeholder/fake reader page tiles. The reader now fetches real page rows and signed URLs, and clearly states when a chapter has metadata but no uploaded page images.
+- Added a query for real published chapter metadata to support release lists.
+- Removed seeded fake community posts and fake review/rating counts. The community feed and work reviews now show empty states until actual reader activity exists.
+- Removed fabricated view counts and relative publication times from the ranking/release UI. The ranking is labeled by actual rating, and the dedicated latest-chapters page now queries published chapter metadata.
+- Current database check: 16 published works; 3,849 published chapter metadata rows; 0 page-image rows in `site_chapter_pages`. Cover URLs are currently null for the 16 works. Thus the catalog can list titles and chapters, but it cannot show original cover art or reader pages until those assets are uploaded.
+- Validation is static CI only; browser-based login, Owner dashboard, and storage upload tests still require an authenticated browser session.
