@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urljoin, urlparse
+from datetime import datetime, time, timedelta, timezone
 import re
 
 
@@ -31,7 +32,9 @@ class _PageParser(HTMLParser):
             if key and attrs.get("content"):
                 self.metas[key] = attrs["content"].strip()
         elif tag.lower() == "a":
-            self._anchor = {"href": attrs.get("href", ""), "text": []}
+            self._anchor = {"href": attrs.get("href", ""), "text": [], "datetime": None}
+        elif tag.lower() == "time" and self._anchor is not None:
+            self._anchor["datetime"] = attrs.get("datetime") or attrs.get("content")
         elif tag.lower() == "img":
             for key in ("src", "data-src", "data-original", "data-lazy-src"):
                 if attrs.get(key):
@@ -66,6 +69,110 @@ def _parse(html: str) -> _PageParser:
     return parser
 
 
+
+
+_ASURA_DATE_SUFFIX = re.compile(
+    r"(?P<date>[A-Za-z]{3,9}\\s+\\d{1,2},\\s+\\d{4})$",
+    re.I,
+)
+_ASURA_RELATIVE_SUFFIX = re.compile(
+    r"(?P<age>just now|yesterday|last week|last month|last year|"
+    r"(?:\\d+|a|an|one)\\s+(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\\s+ago)$",
+    re.I,
+)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _chapter_display_metadata(
+    raw_title: str,
+    observed_at: datetime,
+    explicit_datetime: str | None = None,
+) -> tuple[str, str | None]:
+    """Separate Asura's release-age/date suffix from the visible chapter title."""
+    text = re.sub(r"\\s+", " ", (raw_title or "").strip())
+    observed = _as_utc(observed_at)
+    published_at = None
+    suffix = None
+
+    if explicit_datetime:
+        raw_datetime = str(explicit_datetime).strip()
+        try:
+            parsed = datetime.fromisoformat(raw_datetime.replace("Z", "+00:00"))
+            if len(raw_datetime) == 10:
+                parsed = datetime.combine(parsed.date(), time(12, 0), tzinfo=timezone.utc)
+            published_at = _as_utc(parsed)
+        except ValueError:
+            pass
+
+    if published_at is None:
+        date_match = _ASURA_DATE_SUFFIX.search(text)
+        if date_match:
+            suffix = date_match.group("date")
+            date_text = suffix.strip()
+            for date_format in ("%b %d, %Y", "%B %d, %Y"):
+                try:
+                    parsed_date = datetime.strptime(date_text, date_format).date()
+                    published_at = datetime.combine(
+                        parsed_date, time(12, 0), tzinfo=timezone.utc
+                    )
+                    break
+                except ValueError:
+                    continue
+
+    if published_at is None:
+        age_match = _ASURA_RELATIVE_SUFFIX.search(text)
+        if age_match:
+            suffix = age_match.group("age")
+            age = suffix.lower()
+            if age == "just now":
+                delta = timedelta(0)
+            elif age == "yesterday":
+                delta = timedelta(days=1)
+            elif age == "last week":
+                delta = timedelta(days=7)
+            elif age == "last month":
+                delta = timedelta(days=30)
+            elif age == "last year":
+                delta = timedelta(days=365)
+            else:
+                relative = re.fullmatch(
+                    r"(a|an|one|\\d+)\\s+(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\\s+ago",
+                    age,
+                    re.I,
+                )
+                if relative:
+                    quantity = 1 if relative.group(1) in {"a", "an", "one"} else int(relative.group(1))
+                    unit = relative.group(2).lower()
+                    if unit.startswith(("second", "sec")):
+                        delta = timedelta(seconds=quantity)
+                    elif unit.startswith(("minute", "min")):
+                        delta = timedelta(minutes=quantity)
+                    elif unit.startswith(("hour", "hr")):
+                        delta = timedelta(hours=quantity)
+                    elif unit.startswith("day"):
+                        delta = timedelta(days=quantity)
+                    elif unit.startswith("week"):
+                        delta = timedelta(weeks=quantity)
+                    elif unit.startswith("month"):
+                        delta = timedelta(days=30 * quantity)
+                    else:
+                        delta = timedelta(days=365 * quantity)
+                else:
+                    delta = None
+            if delta is not None:
+                published_at = observed - delta
+
+    display_title = text
+    if suffix:
+        display_title = text[: -len(suffix)].rstrip(" -–—•|\\t")
+    return display_title, published_at.isoformat() if published_at else None
+
+
 def parse_listing(html: str, page_url: str) -> list[dict]:
     parser = _parse(html)
     found, seen = [], set()
@@ -83,8 +190,13 @@ def parse_listing(html: str, page_url: str) -> list[dict]:
     return found
 
 
-def parse_detail(html: str, page_url: str) -> dict:
+def parse_detail(
+    html: str,
+    page_url: str,
+    observed_at: datetime | None = None,
+) -> dict:
     parser = _parse(html)
+    observed_at = observed_at or datetime.now(timezone.utc)
     title = parser.metas.get("og:title", "")
     title = re.sub(r"\s*[|–-]\s*Asura Scans.*$", "", title, flags=re.I).strip()
     if not title:
@@ -131,9 +243,17 @@ def parse_detail(html: str, page_url: str) -> dict:
         if not match:
             continue
         number = float(match.group(2))
+        raw_chapter_title = anchor["text"] or f"Chapter {match.group(2)}"
+        display_title, source_published_at = _chapter_display_metadata(
+            raw_chapter_title,
+            observed_at,
+            anchor.get("datetime"),
+        )
         chapters[number] = {
             "number": number,
-            "title": anchor["text"] or f"Chapter {match.group(2)}",
+            "title": raw_chapter_title,
+            "display_title": display_title or raw_chapter_title,
+            "source_published_at": source_published_at,
             "url": absolute,
         }
     description = parser.metas.get("og:description") or parser.metas.get("description") or ""
