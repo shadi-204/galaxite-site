@@ -36,7 +36,7 @@ const CHANNELS = [["all", "كل المنشورات", "#fff"], ["announce", "إع
 const chName = (id) => (CHANNELS.find((c) => c[0] === id) || CHANNELS[2])[1];
 const SEED = [];
 const posts = () => [...S("vx-posts", []), ...SEED].sort((a, b) => b.ts - a.ts);
-const LB = [["قمر الصحراء", 1240], ["ظل الليل", 1105], ["نجم الشتاء", 990], ["صقر الشرق", 760], ["سيف الفجر", 640], ["ريم القارئة", 515], ["ليل المدينة", 420], ["جوهرة", 330]];
+const LB = [];
 const board = () => { const u = me(); const l = LB.map(([n, x]) => ({ n, x, me: 0 })); if (u) l.push({ n: u.name, x: u.xp, me: 1 }); return l.sort((a, b) => b.x - a.x); };
 let cv = "feed", cc = "all", ct = "foryou", cq = "";
 function community() {
