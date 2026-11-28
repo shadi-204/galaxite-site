@@ -136,7 +136,7 @@ function series(w) {
   A.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => { st = b.dataset.k; series(w); VX.reveal($("#app")); }));
   if ($("#sq")) $("#sq").oninput = (e) => { sq = e.target.value; const p = e.target.selectionStart; series(w); const n = $("#sq"); n.focus(); n.setSelectionRange(p, p); };
   if ($("#so")) $("#so").onclick = () => { sort = sort === "new" ? "old" : "new"; series(w); };
-  if ($("#ma")) $("#ma").onclick = () => { prog[w.title] = w.chapters; store.set("prog", prog); toastM("تم تحديد الكل كمقروء", "ok"); series(w); };
+  if ($("#ma")) $("#ma").onclick = () => { if (base.length) prog[w.title] = base[0]; store.set("prog", prog); toastM("تم تحديد الكل كمقروء", "ok"); series(w); };
   if ($("#mo")) $("#mo").onclick = () => { sMax += 60; series(w); };
   if ($("#mark")) $("#mark").onclick = () => { marks = marks.includes(w.title) ? marks.filter((t) => t !== w.title) : [...marks, w.title]; store.set("marks", marks); series(w); };
   if ($("#reportWork")) $("#reportWork").onclick = () => window.GalaxiteReports?.open({ targetType: "work", targetId: slug(w), targetTitle: w.title, targetPath: `#/s/${slug(w)}` });
