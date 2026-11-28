@@ -91,8 +91,12 @@ function realGate(p, msg) {
           const email = $("#em").value.trim();
           if (!isOwner(email)) { $("#ge").textContent = "هذا الحساب غير مسموح له بالدخول."; return; }
           const button = $("#resendOwnerConfirm"); button.disabled = true;
-          const { error: resendError } = await window.GALAXITE_SUPABASE_CLIENT.auth.resend({ type: "signup", email });
-          $("#ge").textContent = resendError ? (resendError.message || "تعذر إرسال رسالة التأكيد.") : "تم طلب إرسال رسالة التأكيد. افحص البريد الوارد والرسائل غير المرغوب فيها.";
+          try {
+            const { error: resendError } = await window.GALAXITE_SUPABASE_CLIENT.auth.resend({ type: "signup", email });
+            $("#ge").textContent = resendError ? (resendError.message || "تعذر إرسال رسالة التأكيد.") : "تم طلب إرسال رسالة التأكيد. افحص البريد الوارد والرسائل غير المرغوب فيها.";
+          } catch (resendError) {
+            $("#ge").textContent = resendError?.message || "تعذر إرسال رسالة التأكيد.";
+          } finally { button.disabled = false; }
         };
       } else {
         $("#ge").textContent = error?.message || "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات.";
