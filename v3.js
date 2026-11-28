@@ -146,26 +146,94 @@ function series(w) {
     $("#rf").onsubmit = (e) => { e.preventDefault(); const t = $("#rt").value.trim(); if (!t) return; const o = S("vx-rev", {}); o[w.title] = [{ u: u.name, s: sc, t, ts: Date.now() }, ...(o[w.title] || [])]; W("vx-rev", o); W("vx-revcount", S("vx-revcount", 0) + 1); toastM("تم نشر مراجعتك", "ok"); series(w); }; }
 }
 
-/* ---------- القارئ: أزرار عائمة ---------- */
+/* ---------- القارئ: أزرار جانبية قابلة للإظهار والإخفاء ---------- */
 const _ri = readerInit;
 readerInit = function (w, ch) {
+  window.GALAXITE_READER_UI_CLEANUP?.();
   _ri(w, ch);
-  if (!$("#cj")) return;
-  document.querySelector(".fab")?.remove(); clearInterval(window.__auto);
-  const f = document.createElement("div"); f.className = "fab";
-  f.innerHTML = `<span class="pc" id="pc">1/1</span><button id="f-dn" aria-label="نزول">${IC.down}</button><button id="f-ls" aria-label="الفصول">${IC.list}</button><button id="f-zi" aria-label="تكبير">${IC.plus}</button><button id="f-zo" aria-label="تصغير">${IC.minus}</button><button id="f-fs" aria-label="ملء الشاشة">${IC.full}</button><button id="f-pl" aria-label="تمرير تلقائي">${IC.play}</button><button id="f-up" aria-label="للأعلى">${IC.up}</button>`;
+  const pages = document.querySelector(".pages");
+  if (!$("#cj") || !pages) return;
+
+  document.querySelector(".fab")?.remove();
+  if (window.__auto) { clearInterval(window.__auto); window.__auto = 0; }
+
+  const f = document.createElement("div");
+  f.className = "fab";
+  f.setAttribute("aria-label", "أدوات القراءة");
+  f.innerHTML = `<span class="pc" id="pc">1/1</span>
+    <button id="f-dn" aria-label="نزول">${IC.down}</button>
+    <button id="f-ls" aria-label="الفصول">${IC.list}</button>
+    <button id="f-zi" aria-label="تكبير">${IC.plus}</button>
+    <button id="f-zo" aria-label="تصغير">${IC.minus}</button>
+    <button id="f-fs" aria-label="ملء الشاشة">${IC.full}</button>
+    <button id="f-pl" aria-label="تمرير تلقائي">${IC.play}</button>
+    <button id="f-up" aria-label="للأعلى">${IC.up}</button>`;
   document.body.appendChild(f);
+
   const pg = () => [...document.querySelectorAll(".pages > *")];
-  const upd = () => { const a = pg(); if (!a.length || !$("#pc")) return; let i = 0; a.forEach((e, k) => { if (e.getBoundingClientRect().top < innerHeight * 0.4) i = k; }); $("#pc").textContent = `${nm(i + 1)}/${nm(a.length)}`; };
-  const prev = window.onscroll; window.onscroll = () => { if (prev) prev(); upd(); if (!$("#pc")) { f.remove(); window.onscroll = null; } };
+  const upd = () => {
+    const items = pg();
+    if (!items.length || !$("#pc")) return;
+    let i = 0;
+    items.forEach((element, index) => {
+      if (element.getBoundingClientRect().top < innerHeight * 0.4) i = index;
+    });
+    $("#pc").textContent = `${nm(i + 1)}/${nm(items.length)}`;
+  };
+
+  const toggleControls = () => {
+    const hidden = f.classList.toggle("gx-controls-hidden");
+    f.setAttribute("aria-hidden", String(hidden));
+  };
+  const onPageTap = (event) => {
+    if (event.target.closest("a,button,select,input,textarea")) return;
+    const inCenterX = event.clientX >= innerWidth * 0.34 && event.clientX <= innerWidth * 0.66;
+    const inCenterY = event.clientY >= innerHeight * 0.28 && event.clientY <= innerHeight * 0.72;
+    if (inCenterX && inCenterY) toggleControls();
+  };
+  pages.addEventListener("click", onPageTap);
+
+  const prevScroll = window.onscroll;
+  window.onscroll = () => {
+    if (prevScroll) prevScroll();
+    upd();
+    if (!$("#pc")) window.onscroll = null;
+  };
   upd();
+
   $("#f-dn").onclick = () => scrollBy({ top: innerHeight * 0.9, behavior: "smooth" });
   $("#f-up").onclick = () => scrollTo({ top: 0, behavior: "smooth" });
-  $("#f-ls").onclick = () => { $("#cj").focus(); $("#cj").scrollIntoView({ block: "center" }); };
-  $("#f-zi").onclick = () => $("#zi").click(); $("#f-zo").onclick = () => $("#zo").click();
-  $("#f-fs").onclick = () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch {} };
-  $("#f-pl").onclick = () => { if (window.__auto) { clearInterval(window.__auto); window.__auto = 0; $("#f-pl").innerHTML = IC.play; } else { window.__auto = setInterval(() => scrollBy(0, 2), 16); $("#f-pl").innerHTML = IC.pause; } };
-  window.addEventListener("hashchange", () => { f.remove(); clearInterval(window.__auto); }, { once: true });
+  $("#f-ls").onclick = () => {
+    $("#cj").focus();
+    document.querySelector(".reader-topbar")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  $("#f-zi").onclick = () => $("#zi")?.click();
+  $("#f-zo").onclick = () => $("#zo")?.click();
+  $("#f-fs").onclick = () => {
+    try {
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    } catch {}
+  };
+  $("#f-pl").onclick = () => {
+    if (window.__auto) {
+      clearInterval(window.__auto);
+      window.__auto = 0;
+      $("#f-pl").innerHTML = IC.play;
+    } else {
+      window.__auto = setInterval(() => scrollBy(0, 2), 16);
+      $("#f-pl").innerHTML = IC.pause;
+    }
+  };
+
+  const cleanup = () => {
+    pages.removeEventListener("click", onPageTap);
+    window.removeEventListener("hashchange", cleanup);
+    if (f.isConnected) f.remove();
+    if (window.__auto) { clearInterval(window.__auto); window.__auto = 0; }
+    if (window.GALAXITE_READER_UI_CLEANUP === cleanup) window.GALAXITE_READER_UI_CLEANUP = null;
+  };
+  window.GALAXITE_READER_UI_CLEANUP = cleanup;
+  window.addEventListener("hashchange", cleanup, { once: true });
 };
 
 /* ---------- الرئيسية: بطاقات المثبت وآخر الإصدارات ---------- */
