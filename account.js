@@ -80,7 +80,7 @@ const put = (u) => {
   refreshHead();
   if (authUserId && realProvider() === "supabase") {
     window.GALAXITE_GET_SUPABASE_CLIENT?.().then((db) => db?.from("profiles")
-      .update({ display_name: u.name || String(u.email).split("@")[0], bio: u.bio || "", xp: Number(u.xp) || 0 })
+      .update({ display_name: u.name || String(u.email).split("@")[0], bio: u.bio || "" })
       .eq("id", authUserId))
       .then(({ error }) => { if (error) console.warn("Galaxite profile sync failed.", error); })
       .catch((error) => console.warn("Galaxite profile sync failed.", error));
@@ -289,8 +289,7 @@ async function finish(email, name, next) {
       const { error } = await db.from("profiles").upsert({
         id: authUserId,
         display_name: profile.name || String(email).split("@")[0],
-        bio: profile.bio || "",
-        xp: Number(profile.xp) || 0
+        bio: profile.bio || ""
       }, { onConflict: "id" });
       if (error) console.warn("Galaxite profile create/update failed.", error);
     } catch (error) {
@@ -325,12 +324,12 @@ async function restore() {
       authUserId = user?.id || null;
       if (authUserId) {
         const { data, error } = await db.from("profiles")
-          .select("display_name,bio,xp").eq("id", authUserId).maybeSingle();
+          .select("display_name,bio").eq("id", authUserId).maybeSingle();
         if (error) console.warn("Galaxite profile load failed.", error);
-        if (data) profile = { ...profile, name: data.display_name || profile.name, bio: data.bio || "", xp: Number(data.xp) || 0 };
+        if (data) profile = { ...profile, name: data.display_name || profile.name, bio: data.bio || "" };
         else {
           const { error: insertError } = await db.from("profiles").upsert({
-            id: authUserId, display_name: profile.name, bio: profile.bio || "", xp: Number(profile.xp) || 0
+            id: authUserId, display_name: profile.name, bio: profile.bio || ""
           }, { onConflict: "id" });
           if (insertError) console.warn("Galaxite profile bootstrap failed.", insertError);
         }
