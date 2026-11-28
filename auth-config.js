@@ -4,7 +4,7 @@ window.AUTH_CONFIG = {
   provider: "supabase",
   firebase: { apiKey: "", authDomain: "", projectId: "", appId: "" },
   supabase: {
-    url: "https://daqjqiuyrxtlutqjraxc.supabase.co",
-    anonKey: "sb_publishable_aaGiJ_QTZ-9kSuQli6Klyg_ko496RRj"
+    url: "https://rlwdimrbrbkvjqjsfmnl.supabase.co",
+    anonKey: "sb_publishable_0_SCF5uAaN3b9oQECQLHeQ_OZwbwfN7"
   }
 };
