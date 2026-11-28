@@ -91,6 +91,8 @@ function series(w) {
   const chapterRows = chaptersFor(w);
   const base = chapterRows.map((chapter) => Number(chapter.number)).filter((number) => Number.isFinite(number) && number > 0);
   const firstP = base.find((c) => !V.premium(w, c));
+  const oldest = base.length ? base[base.length - 1] : null;
+  const latest = base.length ? base[0] : null;
   let chs = base.filter((c) => !sq || String(c).includes(sq.replace(/\D/g, "")) || ("الفصل " + c).includes(sq));
   if (sort === "old") chs = [...chs].reverse();
   const shown = chs.slice(0, sMax);
@@ -111,21 +113,24 @@ function series(w) {
     ${allR.map((r) => `<div class="rv2">${av(r.u)}<div><b dir="auto">${esc(r.u)}</b> <small>${rel(r.ts)}</small><div class="ys">${"★".repeat(r.s)}${"☆".repeat(5 - r.s)}</div><p dir="auto">${esc(r.t)}</p></div></div>`).join("")}`;
   if (st === "disc") { const pl = posts().filter((p) => p.series === w.title); body = `<div class="syn"><h4>النقاشات</h4><p>ناقش ${esc(w.title)} مع باقي القراء في المجتمع.</p>${pl.map((p) => `<div class="rv2">${av(p.u)}<div><b>${esc(p.u)}</b> <small>${rel(p.ts)}</small><p dir="auto">${esc(p.txt)}</p></div></div>`).join("") || '<p class="empty">مفيش نقاشات لسه. كن أول واحد يبدأ.</p>'}<a class="cta" href="#/community">ابدأ نقاش في المجتمع</a></div>`; }
   if (st === "media") body = `<div class="syn"><p class="empty">لسه مفيش لقطات. زر الكاميرا في القارئ هيسمح للقراء يحفظوا مشاهد ويشاركوها هنا (يحتاج قاعدة بيانات).</p></div>`;
-  $("#app").innerHTML = `<div class="sp"><div class="spbg" style="background:${grad(w.title, 30)}"></div><a class="back" href="#/">← رجوع</a>
-  <div class="spgrid"><aside class="spside">${cover(w, "big")}<div class="spstats"><div><b>${w.ratingCount ? Number(w.rating).toFixed(1) : "—"}</b><small>تقييم القرّاء</small></div><div><b>${nm(base.length)}</b><small>الفصول</small></div></div>
-    <a class="cta wide" href="#/r/${slug(w)}/${prog[w.title] || 1}">${prog[w.title] ? "أكمل القراءة · فصل " + nm(prog[w.title]) : "ابدأ القراءة · فصل ١"}</a><button class="cta alt wide" id="mark">${marks.includes(w.title) ? "في المفضلة" : "أضف للمفضلة"}</button>
-    <ul class="spinfo"><li><span>الحالة</span><b>${esc(w.status)}</b></li><li><span>النوع</span><b>${kind(w)}</b></li><li><span>الفصول</span><b>${nm(base.length)}</b></li></ul></aside>
-  <div class="spmain"><h2 dir="auto">${esc(w.title)}</h2>
-<p class="spgenres">${(w.genres || []).map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p>
-<section class="engagement-panel" id="workRatingBox" data-work-id="${esc(w.id)}">
-  <div class="engagement-rating-head"><div><b>تقييم القرّاء</b><small id="workRatingCount">جارٍ تحميل التقييمات</small></div><strong id="workRatingAverage">— / 10</strong></div>
-  <label for="myWorkRating">قيّم العمل من 1 إلى 10</label>
-  <div class="rating-slider"><input id="myWorkRating" type="range" min="1" max="10" step="1" value="5"><output id="myWorkRatingValue">5 / 10</output></div>
-  <button class="cta" id="saveWorkRating" type="button">حفظ تقييمي</button>
-  <small id="workRatingNote">كل حساب يقدر يضيف تقييمًا واحدًا للعمل.</small>
-</section>
-<div class="stabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" data-k="${k}" class="${st === k ? "on" : ""}">${t}</button>`).join("")}</div>${body}</div>
-  <aside class="spsim"><h4>أعمال مشابهة</h4>${sim.map((x) => `<a href="#/s/${slug(x)}"><span class="thm" style="background:${grad(x.title)}"></span><span dir="auto"><b>${esc(x.title)}</b><small>${IC.star} ${x.rating} · ${nm(x.chapters)} فصل</small></span></a>`).join("")}</aside></div></div>`;
+  $("#app").innerHTML = `<a class="back" href="#/">← رجوع</a>
+  <div class="top">${cover(w, "big")}<div><h2 dir="auto">${esc(w.title)}</h2>
+  <p><span class="badge">${kind(w)}</span> <span class="badge alt"><i class="dot ${w.status === 'مستمر' ? 'on' : ''}"></i>${esc(w.status)}</span> ⭐ ${w.ratingCount ? Number(w.rating).toFixed(1) : "—"}</p>
+  <p>${(w.genres || []).map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p><p>${esc(w.desc || "")}</p>
+  ${oldest !== null ? `<a class="cta" href="#/r/${slug(w)}/${oldest}">أقدم فصل متاح</a>` : ""}
+  ${latest !== null && latest !== oldest ? `<a class="cta alt" href="#/r/${slug(w)}/${latest}">أحدث فصل متاح</a>` : latest !== null ? `<a class="cta alt" href="#/r/${slug(w)}/${latest}">ابدأ القراءة</a>` : ""}
+  ${prog[w.title] ? `<a class="cta alt" href="#/r/${slug(w)}/${prog[w.title]}">أكمل من الفصل ${prog[w.title]}</a>` : ""}
+  <button class="cta alt" id="mark">${marks.includes(w.title) ? "★ في المفضلة" : "☆ أضف للمفضلة"}</button><button class="cta alt" id="reportWork" type="button">الإبلاغ عن مشكلة في العمل</button></div></div>
+  <section class="engagement-panel" id="workRatingBox" data-work-id="${esc(w.id)}">
+    <div class="engagement-rating-head"><div><b>تقييم القرّاء</b><small id="workRatingCount">جارٍ تحميل التقييمات</small></div><strong id="workRatingAverage">— / 10</strong></div>
+    <label for="myWorkRating">قيّم العمل من 1 إلى 10</label>
+    <div class="rating-slider"><input id="myWorkRating" type="range" min="1" max="10" step="1" value="5"><output id="myWorkRatingValue">5 / 10</output></div>
+    <button class="cta" id="saveWorkRating" type="button">حفظ تقييمي</button>
+    <small id="workRatingNote">كل حساب يقدر يضيف تقييمًا واحدًا للعمل.</small>
+  </section>
+  <div class="stabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" data-k="${k}" class="${st === k ? "on" : ""}">${t}</button>`).join("")}</div>
+  ${st === "ch" ? `<h3 class="h">الفصول المتاحة (${base.length})</h3>` : ""}
+  ${body}`;
   window.GALAXITE_ENGAGEMENT?.bindWorkRating?.(w);
   const A = $("#app");
   A.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => { st = b.dataset.k; series(w); VX.reveal($("#app")); }));
@@ -134,6 +139,7 @@ function series(w) {
   if ($("#ma")) $("#ma").onclick = () => { prog[w.title] = w.chapters; store.set("prog", prog); toastM("تم تحديد الكل كمقروء", "ok"); series(w); };
   if ($("#mo")) $("#mo").onclick = () => { sMax += 60; series(w); };
   if ($("#mark")) $("#mark").onclick = () => { marks = marks.includes(w.title) ? marks.filter((t) => t !== w.title) : [...marks, w.title]; store.set("marks", marks); series(w); };
+  if ($("#reportWork")) $("#reportWork").onclick = () => window.GalaxiteReports?.open({ targetType: "work", targetId: slug(w), targetTitle: w.title, targetPath: `#/s/${slug(w)}` });
   if ($("#sh")) $("#sh").onclick = () => { try { navigator.clipboard.writeText(location.href); } catch {} toastM("تم نسخ الرابط"); };
   A.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => { const o = S("vx-react", {}); o[w.title] = o[w.title] || {}; o[w.title][b.dataset.r] = !o[w.title][b.dataset.r]; W("vx-react", o); series(w); }));
   if ($("#rf")) { let sc = 5; const paint = () => A.querySelectorAll("#rs button").forEach((b) => b.classList.toggle("on", +b.dataset.s <= sc)); paint(); A.querySelectorAll("#rs button").forEach((b) => (b.onclick = () => { sc = +b.dataset.s; paint(); }));
