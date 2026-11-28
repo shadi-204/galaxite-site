@@ -78,18 +78,26 @@ function series(w) {
   const latest = chapters.length ? chapters[0].number : null;
   $("#app").innerHTML = `<a class="back" href="#/">← رجوع</a>
   <div class="top">${cover(w, "big")}<div><h2 dir="auto">${esc(w.title)}</h2>
-  <p><span class="badge">${kind(w)}</span> <span class="badge alt"><i class="dot ${w.status === 'مستمر' ? 'on' : ''}"></i>${esc(w.status)}</span> ⭐ ${w.rating}</p>
+  <p><span class="badge">${kind(w)}</span> <span class="badge alt"><i class="dot ${w.status === 'مستمر' ? 'on' : ''}"></i>${esc(w.status)}</span> ⭐ ${w.ratingCount ? Number(w.rating).toFixed(1) : "—"}</p>
   <p>${w.genres.map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p><p>${esc(w.desc)}</p>
   ${oldest !== null ? `<a class="cta" href="#/r/${slug(w)}/${oldest}">أقدم فصل متاح</a>` : ""}
   ${latest !== null && latest !== oldest ? `<a class="cta alt" href="#/r/${slug(w)}/${latest}">أحدث فصل متاح</a>` : latest !== null ? `<a class="cta alt" href="#/r/${slug(w)}/${latest}">ابدأ القراءة</a>` : ""}
   ${prog[w.title] ? `<a class="cta alt" href="#/r/${slug(w)}/${prog[w.title]}">أكمل من الفصل ${prog[w.title]}</a>` : ""}
   <button class="cta alt" id="mark">${marks.includes(w.title) ? "★ في المفضلة" : "☆ أضف للمفضلة"}</button><button class="cta alt" id="reportWork" type="button">الإبلاغ عن مشكلة في العمل</button></div></div>
+  <section class="engagement-panel" id="workRatingBox" data-work-id="${esc(w.id)}">
+    <div class="engagement-rating-head"><div><b>تقييم القرّاء</b><small id="workRatingCount">جارٍ تحميل التقييمات</small></div><strong id="workRatingAverage">— / 10</strong></div>
+    <label for="myWorkRating">قيّم العمل من 1 إلى 10</label>
+    <div class="rating-slider"><input id="myWorkRating" type="range" min="1" max="10" step="1" value="5"><output id="myWorkRatingValue">5 / 10</output></div>
+    <button class="cta" id="saveWorkRating" type="button">حفظ تقييمي</button>
+    <small id="workRatingNote">كل حساب يقدر يضيف تقييمًا واحدًا للعمل.</small>
+  </section>
   <h3 class="h">الفصول المتاحة (${chapters.length})</h3>
   <div class="chs">${visible.map((chapter) => {
     const number = chapter.number;
     const premium = VX.premium(w, number);
     return `<a class="ch" href="#/r/${slug(w)}/${number}"><span>${esc(chapter.title || ("الفصل " + number))}</span><small>${premium ? (VX.locked(w, number) ? "● مميز" : "○ مفتوح") : "متاح"}${(prog[w.title] || 0) === number ? " · وصلت هنا" : ""}</small></a>`;
   }).join("")}</div>${chapters.length > 50 ? `<button class="cta alt" id="more" style="margin-top:12px">${showAll ? "عرض أقل" : "عرض كل الفصول (" + chapters.length + ")"}</button>` : chapters.length ? "" : '<p class="empty">لسه مفيش فصول منشورة للعمل ده.</p>'}`;
+  window.GALAXITE_ENGAGEMENT?.bindWorkRating?.(w);
   if ($("#more")) $("#more").onclick = () => { showAll = !showAll; series(w); };
   $("#mark").onclick = () => { marks = marks.includes(w.title) ? marks.filter((t) => t !== w.title) : [...marks, w.title]; store.set("marks", marks); series(w); };
   if ($("#reportWork")) $("#reportWork").onclick = () => window.GalaxiteReports?.open({ targetType: "work", targetId: slug(w), targetTitle: w.title, targetPath: `#/s/${slug(w)}` });
@@ -113,6 +121,10 @@ function reader(w, ch) {
   $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
   <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>
+  <div class="chapter-heart-box" id="chapterHeartBox">
+    <button id="chapterHeartButton" type="button" aria-pressed="false">♡ أعجبني</button>
+    <b id="chapterHeartCount">—</b><small id="chapterHeartNote">القلوب من حسابات Galaxite</small>
+  </div>
   <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="page-loading skel" aria-hidden="true"></div>`}</div>
   <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل الأحدث ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
   <div class="rbar"><span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>`;
@@ -123,6 +135,8 @@ function readerInit(w, ch) {
   $("#cj").onchange = (e) => (location.hash = `#/r/${slug(w)}/${e.target.value}`);
   const z = (d) => { const v = Math.max(360, Math.min(1200, store.get("zoom", 760) + d)); store.set("zoom", v); document.querySelector(".pages").style.maxWidth = v + "px"; };
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
+  const chapterMetaForEngagement = chaptersFor(w).find((item) => item.number === Number(ch));
+  window.GALAXITE_ENGAGEMENT?.bindChapterHeart?.(w.id || slug(w), ch, chapterMetaForEngagement?.id || null);
   const pageBox = document.querySelector(".pages");
   if (pageBox && window.GALAXITE_DB_CATALOG) {
     const chapterMeta = chaptersFor(w).find((item) => item.number === Number(ch));
@@ -287,6 +301,10 @@ $("#theme").onclick = () => { light = !light; store.set("light", light); applyTh
 window.addEventListener("hashchange", route);
 window.addEventListener("galaxite:catalog-updated", route);
 window.addEventListener("galaxite:catalog-state", () => { if (!WORKS.length) catalogUnavailable(); });
+window.addEventListener("galaxite:ratings-updated", () => {
+  const page = location.hash.slice(2).split("/")[0];
+  if (["", "lib", "browse", "cats"].includes(page)) route();
+});
 window.addEventListener("galaxite:work-chapters-updated", (event) => {
   const parts = location.hash.slice(2).split("/");
   if (!["s", "r"].includes(parts[0])) return;
