@@ -26,7 +26,7 @@ const chaptersFor = (w) => {
   }));
 };
 function cover(w, cls = "") {
-  return w.cover ? `<img class="cover ${cls}" src="${esc(w.cover)}" alt="" loading="lazy">`
+  return w.cover ? `<img class="cover ${cls}" src="${esc(w.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
     : `<div class="cover art ${cls}" style="background:${grad(w.title)};--h:${hue(w.title)}"><b class="ini">${esc([...w.title][0].toUpperCase())}</b><span>${esc(w.title)}</span></div>`;
 }
 function cardM(w) {
@@ -132,7 +132,7 @@ function readerInit(w, ch) {
     window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch).then((urls) => {
       if (!pageBox.isConnected) return;
       pageBox.innerHTML = urls.length
-        ? urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy">`).join("")
+        ? urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy" referrerpolicy="no-referrer">`).join("")
         : '<div class="reader-empty"><b>روابط صور الفصل لم تُحدّث بعد.</b><p>هنجلب الروابط الأصلية من المصدر عند طلب تحديث الفصل، من غير حفظ الصور عندنا.</p></div>';
     });
   }
