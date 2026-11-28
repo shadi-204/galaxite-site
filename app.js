@@ -128,13 +128,24 @@ function readerInit(w, ch) {
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
   const pageBox = document.querySelector(".pages");
   if (pageBox && window.GALAXITE_DB_CATALOG) {
-    pageBox.innerHTML = '<div class="page-loading skel" aria-hidden="true"></div><div class="page-loading skel" aria-hidden="true"></div>';
-    window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch).then((urls) => {
-      if (!pageBox.isConnected) return;
-      pageBox.innerHTML = urls.length
-        ? urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy" referrerpolicy="no-referrer">`).join("")
-        : '<div class="reader-empty"><b>روابط صور الفصل لم تُحدّث بعد.</b><p>هنجلب الروابط الأصلية من المصدر عند طلب تحديث الفصل، من غير حفظ الصور عندنا.</p></div>';
-    });
+    const renderPages = () => {
+      pageBox.innerHTML = '<div class="page-loading skel" aria-hidden="true"></div><div class="page-loading skel" aria-hidden="true"></div>';
+      window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch).then((urls) => {
+        if (!pageBox.isConnected) return;
+        pageBox.innerHTML = urls.length
+          ? urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy" referrerpolicy="no-referrer">`).join("")
+          : '<div class="reader-empty"><b>صور الفصل مش متاحة حاليًا.</b><p>المصدر لم يرجّع روابط صور عامة للفصل ده.</p><button class="cta" id="retryChapterPages">حاول تاني</button></div>';
+        const retry = $("#retryChapterPages");
+        if (retry) retry.onclick = renderPages;
+      }).catch((error) => {
+        console.warn("Chapter image refresh failed.", error);
+        if (!pageBox.isConnected) return;
+        pageBox.innerHTML = '<div class="reader-empty"><b>حصلت مشكلة وإحنا بنجهّز صفحات الفصل.</b><p>ممكن تحاول مرة تانية بعد لحظة.</p><button class="cta" id="retryChapterPages">إعادة المحاولة</button></div>';
+        const retry = $("#retryChapterPages");
+        if (retry) retry.onclick = renderPages;
+      });
+    };
+    renderPages();
   }
   window.onscroll = () => { const m = document.documentElement.scrollHeight - innerHeight; const b = $("#pg"); if (b) b.style.width = (m > 0 ? Math.min(100, scrollY / m * 100) : 0) + "%"; else window.onscroll = null; };
 }
