@@ -85,11 +85,13 @@ for (const [htmlName, required] of Object.entries(requiredScripts)) {
   }
   const html = readFileSync(file, "utf8");
   for (const script of required) {
-    if (!html.includes('src="' + script + '"') && !html.includes("src='" + script + "'")) {
+    const scriptPattern = /<script\\b[^>]*src=["']([^"']+)["'][^>]*>/gi;
+    const hasScript = [...html.matchAll(scriptPattern)].some((match) => match[1].split("?")[0] === script);
+    if (!hasScript) {
       fail(htmlName + " does not include required script " + script);
     }
   }
-  const scriptSources = [...html.matchAll(/<script\b[^>]*src=["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
+  const scriptSources = [...html.matchAll(/<script\b[^>]*src=["']([^"']+)["'][^>]*>/gi)].map((match) => match[1].split("?")[0]);
   const order = requiredScriptOrder[htmlName] || [];
   const positions = order.map((script) => scriptSources.indexOf(script));
   if (positions.some((position) => position < 0) || positions.some((position, index) => index > 0 && position <= positions[index - 1])) {
