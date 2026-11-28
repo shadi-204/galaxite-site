@@ -21,15 +21,31 @@
       const workRows = data || [];
       let chapterRows = [];
       if (workRows.length) {
-        const chapterResult = await db.from("site_chapters")
-          .select("work_id,chapter_number,title,is_premium,created_at")
-          .in("work_id", workRows.map((work) => work.id))
-          .eq("is_published", true)
-          .order("chapter_number", { ascending: false });
-        if (chapterResult.error) {
-          console.warn("Published chapter list unavailable.", chapterResult.error);
-        } else {
-          chapterRows = Array.isArray(chapterResult.data) ? chapterResult.data : [];
+        // Keep PostgREST URLs short and page through its row limit. A single
+        // .in() across the entire catalog can become too long once the catalog
+        // grows beyond a few hundred works.
+        const workIdBatchSize = 80;
+        const chapterPageSize = 1000;
+        for (let start = 0; start < workRows.length; start += workIdBatchSize) {
+          const workIds = workRows.slice(start, start + workIdBatchSize).map((work) => work.id);
+          let offset = 0;
+          while (true) {
+            const chapterResult = await db.from("site_chapters")
+              .select("work_id,chapter_number,title,is_premium,created_at")
+              .in("work_id", workIds)
+              .eq("is_published", true)
+              .order("work_id", { ascending: true })
+              .order("chapter_number", { ascending: false })
+              .range(offset, offset + chapterPageSize - 1);
+            if (chapterResult.error) {
+              console.warn("Published chapter batch unavailable.", chapterResult.error);
+              break;
+            }
+            const batch = Array.isArray(chapterResult.data) ? chapterResult.data : [];
+            chapterRows.push(...batch);
+            if (batch.length < chapterPageSize) break;
+            offset += chapterPageSize;
+          }
         }
       }
       const chaptersByWork = new Map();
