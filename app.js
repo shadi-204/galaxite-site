@@ -158,6 +158,7 @@ function route() {
   const p = location.hash.slice(2).split("/");
   window.scrollTo(0, 0);
   document.title = "Galaxite | مانجا ومانهوا";
+  if (p[0] === "admin") { document.title = "لوحة الإدارة | Galaxite"; window.GALAXITE_RENDER_ADMIN?.(); post(p); return; }
   if (!WORKS.length && !["login", "profile", "store"].includes(p[0])) return catalogUnavailable();
   const w = p[1] && byTitle(decodeURIComponent(p[1]));
   if ((p[0] === "s" || p[0] === "r") && !w) return notFound();
@@ -172,7 +173,7 @@ function route() {
   post(p);
 }
 function post(p) {
-  const cur = { lib: "lib", b: "b", store: "store", profile: "profile", login: "profile", community: "community", top: "community", "": "home" }[p[0]];
+  const cur = { lib: "lib", b: "b", store: "store", profile: "profile", login: "profile", community: "community", top: "community", admin: "admin", "": "home" }[p[0]];
   document.querySelectorAll("#bnav a, #mnav a").forEach((x) => x.classList.toggle("on", x.dataset.r === cur));
   document.querySelectorAll("#app .h, #app .item, #app .card, #app .top, #app .stat3, #app .top10 li, #app .gstrip").forEach((e) => e.classList.add("rv"));
   VX.reveal($("#app")); VX.tilt($("#app"));
