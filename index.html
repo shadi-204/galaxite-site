@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="v2.css">
 <link rel="stylesheet" href="v3.css">
-<link rel="stylesheet" href="v4.css?v=25">
+<link rel="stylesheet" href="v4.css?v=26">
 </head>
 <body>
 <a class="skip" href="#app">تخطي إلى المحتوى</a>
@@ -46,13 +46,13 @@
 <script src="engagement.js?v=32"></script>
 <script src="catalog.js"></script>
 <script src="app.js"></script>
-<script src="v3.js?v=2"></script>
+<script src="v3.js?v=3"></script>
 <script src="v4.js"></script>
 <script src="admin-embed.js"></script>
 <script>
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    const key = "galaxite-sw-controller-reload-v36";
+    const key = "galaxite-sw-controller-reload-v37";
     if (sessionStorage.getItem(key) === "1") return;
     sessionStorage.setItem(key, "1");
     location.reload();
