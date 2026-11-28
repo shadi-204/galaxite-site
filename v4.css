@@ -233,3 +233,137 @@ body.light .chapter-date{color:#666}
     background:transparent!important;
   }
 }
+
+
+/* Immersive reader: hide all site-wide navigation and keep only reader controls. */
+body.gx-reader-mode .head,
+body.gx-reader-mode #bnav,
+body.gx-reader-mode .foot,
+body.gx-reader-mode #top,
+body.gx-reader-mode .skip {
+  display:none!important;
+}
+body.gx-reader-mode main#app { padding-bottom:0!important; }
+body.gx-reader-mode .pages {
+  padding-bottom:0!important;
+  margin-top:0!important;
+  background:transparent!important;
+}
+body.gx-reader-mode .pages img {
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  background:transparent!important;
+}
+
+/* The previous fixed bottom .rbar could cover the entire viewport on mobile:
+   the mobile top:0 rule overrode its top:auto. The reader now uses this single
+   normal sticky bar instead of a second fixed bottom bar. */
+.gx-reader-mode .reader-topbar {
+  position:sticky!important;
+  top:0!important;
+  bottom:auto!important;
+  z-index:40;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  width:100%;
+  padding:8px 0;
+  background:#0a0a0af2;
+  border-bottom:1px solid var(--line);
+}
+.gx-reader-mode .reader-topbar select {
+  min-width:110px;
+  min-height:40px;
+  padding:7px 10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  color:inherit;
+  background:var(--card,#17171a);
+  font:inherit;
+}
+.gx-reader-mode .reader-topbar button {
+  width:36px;
+  height:36px;
+  margin-inline-start:4px;
+  border:0;
+  border-radius:8px;
+  color:inherit;
+  background:#ffffff14;
+  font-size:18px;
+  cursor:pointer;
+}
+.gx-reader-mode .reader-topbar span a {
+  display:inline-flex;
+  align-items:center;
+  min-height:38px;
+  margin-inline-start:6px;
+  padding:0 12px;
+  border-radius:9px;
+  background:linear-gradient(90deg,#dc2626,#ef4444);
+  color:#fff;
+}
+body.light.gx-reader-mode .reader-topbar {
+  background:#f6f4f4f5;
+  border-color:#00000018;
+}
+body.light.gx-reader-mode .reader-topbar select,
+body.light.gx-reader-mode .reader-topbar button {
+  background:#0000000b;
+  color:#1a1b24;
+}
+
+/* Tap the middle of a page to slide the right-side reader toolbar in or out. */
+body.gx-reader-mode .fab {
+  transition:transform .24s ease,opacity .24s ease;
+}
+body.gx-reader-mode .fab.gx-controls-hidden {
+  transform:translate(140%,-50%);
+  opacity:0;
+  pointer-events:none;
+}
+
+@media(max-width:640px) {
+  body.gx-reader-mode main#app { padding:6px 0 0!important; }
+  body.gx-reader-mode .reader-topbar {
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:6px 8px;
+    padding:6px 10px;
+  }
+  body.gx-reader-mode .reader-topbar > .back {
+    min-width:0;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    min-height:34px;
+    padding:0 9px;
+    font-size:12px;
+  }
+  body.gx-reader-mode .reader-topbar #cj {
+    width:min(42vw,170px);
+    min-width:0;
+    min-height:34px;
+    padding:4px 7px;
+    font-size:12px;
+  }
+  body.gx-reader-mode .reader-topbar > span:first-of-type { display:none!important; }
+  body.gx-reader-mode .reader-topbar > span:last-of-type {
+    grid-column:1/-1;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+  }
+  body.gx-reader-mode .reader-topbar > span:last-of-type a {
+    min-height:32px;
+    padding:0 11px;
+    margin:0;
+    font-size:12px;
+  }
+  body.gx-reader-mode .pages { width:100%!important; max-width:100%!important; }
+  body.gx-reader-mode .pages img { width:100%!important; max-width:100%!important; }
+}
