@@ -11,7 +11,6 @@ from asura_adapter import parse_listing, parse_detail, parse_chapter
 
 
 BROWSE_URL = "https://asurascans.com/browse/comics?page=1"
-DETAIL_URL = "https://asurascans.com/comics/eleceed-7de80a82"
 
 
 class ProbeParser(HTMLParser):
@@ -70,8 +69,11 @@ if __name__ == "__main__":
         print(f"PARSED_LISTINGS={len(listings)}")
         print(f"LISTING_SAMPLE={listings[:3]}")
 
-        detail_html, detail_dom, detail_meta = inspect(DETAIL_URL)
-        detail = parse_detail(detail_html, DETAIL_URL)
+        if not listings:
+            raise RuntimeError("No listing rows parsed from the live browse page.")
+        detail_url = listings[0]["url"]
+        detail_html, detail_dom, detail_meta = inspect(detail_url)
+        detail = parse_detail(detail_html, detail_url)
         print(f"PARSED_DETAIL_TITLE={detail['title']}")
         print(f"PARSED_DETAIL_DESCRIPTION_CHARS={len(detail['description'])}")
         print(f"PARSED_DETAIL_COVER={bool(detail['cover_url'])}")
