@@ -34,13 +34,7 @@ const toastM = (m, k) => window.VX.toast ? window.VX.toast(m, k) : 0;
 /* ---------- المجتمع ---------- */
 const CHANNELS = [["all", "كل المنشورات", "#fff"], ["announce", "إعلانات", "#ef4444"], ["general", "دردشة عامة", "#9ca3af"], ["series", "نقاش الأعمال", "#f59e0b"], ["theories", "نظريات", "#8b5cf6"], ["read", "إيه أقرأ؟", "#10b981"], ["requests", "طلبات أعمال", "#ec4899"], ["help", "أسئلة ومساعدة", "#3b82f6"], ["fan", "أعمال المعجبين", "#f472b6"]];
 const chName = (id) => (CHANNELS.find((c) => c[0] === id) || CHANNELS[2])[1];
-const SEED = [
-  { id: "s1", u: "فريق المكتبة", ch: "announce", txt: "أهلا بيكم في المجتمع! اقرأوا القواعد وشاركوا بحرية. التعليقات والمشاركة بتديكم XP وتطلعكم في لوحة المتصدرين.", likes: 30, cm: 0, ts: Date.now() - 36e5 * 30 },
-  { id: "s2", u: "نجم الشتاء", ch: "read", txt: "إيه أحسن عمل أكشن ابتديتوه الشهر ده؟ محتاج ترشيحات.", likes: 12, cm: 4, ts: Date.now() - 36e5 * 5 },
-  { id: "s3", u: "ظل الليل", ch: "theories", txt: "نظرية: الشخصية الغامضة هتطلع هي الخصم الحقيقي. (فيه حرق بسيط) رأيكم؟", likes: 9, cm: 6, ts: Date.now() - 36e5 * 3 },
-  { id: "s4", u: "صقر الشرق", ch: "requests", txt: "ياريت نضيف تصنيف رعب وفلتر بالسنة وبحث بالمؤلف.", likes: 7, cm: 1, ts: Date.now() - 36e5 * 2 },
-  { id: "s5", u: "قمر الصحراء", ch: "general", txt: "صباح الخير، مين لسه صاحي بيقرأ؟", likes: 3, cm: 2, ts: Date.now() - 6e5 * 4 },
-];
+const SEED = [];
 const posts = () => [...S("vx-posts", []), ...SEED].sort((a, b) => b.ts - a.ts);
 const LB = [["قمر الصحراء", 1240], ["ظل الليل", 1105], ["نجم الشتاء", 990], ["صقر الشرق", 760], ["سيف الفجر", 640], ["ريم القارئة", 515], ["ليل المدينة", 420], ["جوهرة", 330]];
 const board = () => { const u = me(); const l = LB.map(([n, x]) => ({ n, x, me: 0 })); if (u) l.push({ n: u.name, x: u.xp, me: 1 }); return l.sort((a, b) => b.x - a.x); };
@@ -99,10 +93,10 @@ function series(w) {
   let chs = base.filter((c) => !sq || String(c).includes(sq.replace(/\D/g, "")) || ("الفصل " + c).includes(sq));
   if (sort === "old") chs = [...chs].reverse();
   const shown = chs.slice(0, sMax);
-  const rev = S("vx-rev", {})[w.title] || [], seedR = [{ u: "ريم القارئة", s: 5, t: "رسم جميل وقصة ماسكة من أول فصل.", ts: Date.now() - 864e5 * 9 }];
-  const allR = [...rev, ...seedR], avg = (allR.reduce((a, r) => a + r.s, 0) / allR.length).toFixed(1);
+  const rev = S("vx-rev", {})[w.title] || [];
+  const allR = [...rev], avg = (allR.length ? allR.reduce((a, r) => a + r.s, 0) / allR.length : Number(w.rating || 0)).toFixed(1);
   const reacts = S("vx-react", {})[w.title] || {};
-  const RE = [["أعجبني", 6], ["رائع", 4], ["مضحك", 1], ["صادم", 2], ["حزين", 0], ["غاضب", 1]];
+  const RE = [["أعجبني", 0], ["رائع", 0], ["مضحك", 0], ["صادم", 0], ["حزين", 0], ["غاضب", 0]];
   const sim = WORKS.filter((x) => x !== w).map((x) => ({ x, n: x.genres.filter((g) => w.genres.includes(g)).length })).sort((a, b) => b.n - a.n || b.x.rating - a.x.rating).slice(0, 6).map((o) => o.x);
   const tabs = [["ch", `الفصول (${nm(w.chapters)})`], ["syn", "الملخص"], ["rev", `المراجعات (${nm(allR.length)})`], ["disc", "النقاشات"], ["media", "الميديا"]];
   let body = "";
