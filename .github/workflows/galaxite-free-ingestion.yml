@@ -1,0 +1,49 @@
+name: Galaxite free scheduled ingestion
+
+on:
+  # GitHub scheduled workflows run only from the repository's default branch.
+  # workflow_dispatch can be used on galaxite-preview while we test safely.
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: galaxite-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check required secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::notice::Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY as repository Actions secrets before running ingestion."
+            exit 0
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run one bounded ingestion batch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUN_ONCE: "true"
+          MAX_JOBS_PER_RUN: "1"
+          ASURA_BROWSE_PAGES: "1"
+          ASURA_INITIAL_CHAPTERS: "1"
+          LOG_LEVEL: "INFO"
+        run: python worker/ingestion_worker.py
