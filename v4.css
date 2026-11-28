@@ -742,12 +742,14 @@ body.gx-home-page .hero .dots button.on {
   border-radius: 99px;
 }
 @keyframes gxHeroArtIn {
-  from { opacity: 0; transform: translate3d(-26px, 0, 0) scale(.96); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  0% { opacity: 0; transform: translate3d(0, -13px, 0) scale(.97); }
+  48% { opacity: 1; transform: translate3d(0, 7px, 0) scale(1.015); }
+  76% { transform: translate3d(0, -3px, 0) scale(1.005); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes gxHeroCopyIn {
-  from { opacity: 0; transform: translate3d(18px, 10px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+  0% { opacity: 0; transform: translate3d(0, 11px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @media (max-width: 640px) {
@@ -775,3 +777,61 @@ body.gx-home-page .hero .dots button.on {
   }
 }
 
+
+
+/* Stable RTL genre ticker: keep the track's motion axis LTR and each chip's text RTL. */
+body.gx-home-page .gstrip {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  direction: ltr;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 4%, #000 96%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 4%, #000 96%, transparent 100%);
+}
+body.gx-home-page .gstrip.is-dragging {
+  cursor: grabbing;
+}
+body.gx-home-page .gstrip-track {
+  display: flex;
+  flex-direction: row;
+  direction: ltr;
+  width: max-content;
+  max-width: none;
+  align-items: center;
+  gap: 22px;
+  will-change: transform;
+}
+body.gx-home-page .gstrip-set {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  direction: rtl;
+}
+body.gx-home-page .gchip {
+  flex: 0 0 auto;
+  max-width: none;
+  min-height: 38px;
+  direction: rtl;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+@media (min-width: 641px) {
+  body.gx-home-page .hero .gx-slide-art {
+    animation: gxHeroArtIn .72s cubic-bezier(.2,.75,.25,1) both;
+  }
+  body.gx-home-page .hero .gx-slide-copy {
+    animation: gxHeroCopyIn .62s cubic-bezier(.2,.75,.25,1) both;
+  }
+}
