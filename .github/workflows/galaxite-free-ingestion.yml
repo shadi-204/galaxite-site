@@ -11,6 +11,7 @@ on:
       - galaxite-preview
     paths:
       - "worker/ingestion_worker.py"
+      - ".github/workflows/galaxite-free-ingestion.yml"
 
 permissions:
   contents: read
@@ -58,7 +59,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RUN_ONCE: "true"
           MAX_JOBS_PER_RUN: "2"
-          ASURA_BROWSE_PAGES: "1"
+          ASURA_BROWSE_PAGES: "22"
           ASURA_INITIAL_CHAPTERS: "1"
           ASURA_INITIAL_WORKS_WITH_CHAPTERS: "20"
           LOG_LEVEL: "INFO"
