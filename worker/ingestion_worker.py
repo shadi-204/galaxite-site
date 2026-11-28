@@ -186,9 +186,13 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
         else:
             work_id = supabase.insert("site_works", fields)["id"]
         chapters = detail["chapters"]
-        selected_for_download = (set(x["number"] for x in chapters[-initial_chapters:])
+        # Keep only the newest N chapter metadata rows per work. The full
+        # source count remains in chapter_count; importing every historical
+        # chapter one-by-one would create thousands of unnecessary API calls.
+        latest_chapters = chapters[-initial_chapters:] if initial_chapters else []
+        selected_for_download = (set(x["number"] for x in latest_chapters)
                                  if initial_chapters and work_index < download_works else set())
-        for chapter in chapters:
+        for chapter in latest_chapters:
             number = chapter["number"]
             query = f"select=id&work_id=eq.{work_id}&chapter_number=eq.{number}&limit=1"
             found = supabase.rows("site_chapters", query)
