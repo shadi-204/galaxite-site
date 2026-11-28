@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "galaxite-mobile-";
-const V = CACHE_PREFIX + "v36";
+const V = CACHE_PREFIX + "v37";
 const FILES = [
   "./",
   "./index.html",
@@ -13,7 +13,7 @@ const FILES = [
   "./reports.js",
   "./engagement.js?v=32",
   "./catalog.js",
-  "./app.js?v=3",
+  "./app.js",
   "./v3.js?v=2",
   "./v4.js",
   "./admin-embed.js",
