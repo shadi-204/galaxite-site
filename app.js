@@ -147,16 +147,11 @@ function reader(w, ch) {
   const pages = (w.pages && w.pages[ch]) || [];
   const chapterTitle = chapters.find((chapter) => chapter.number === ch)?.title || `الفصل ${ch}`;
   const options = chapters.map((numberRow) => `<option value="${numberRow.number}"${numberRow.number === ch ? " selected" : ""}>${esc(numberRow.title || ("الفصل " + numberRow.number))}</option>`).join("");
-  $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
+  $("#app").innerHTML = `<div class="reader-topbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
   <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>
-  <div class="chapter-heart-box" id="chapterHeartBox">
-    <button id="chapterHeartButton" type="button" aria-pressed="false">♡ أعجبني</button>
-    <b id="chapterHeartCount">—</b><small id="chapterHeartNote">القلوب من حسابات Galaxite</small>
-  </div>
   <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="page-loading skel" aria-hidden="true"></div>`}</div>
-  <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل الأحدث ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
-  <div class="rbar"><span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>`;
+  <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل الأحدث ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>`;
 }
 function readerInit(w, ch) {
   const previousCleanup = window.GALAXITE_READER_CLEANUP;
@@ -167,8 +162,6 @@ function readerInit(w, ch) {
   $("#cj").onchange = (e) => (location.hash = `#/r/${slug(w)}/${e.target.value}`);
   const z = (d) => { const v = Math.max(360, Math.min(1200, store.get("zoom", 760) + d)); store.set("zoom", v); document.querySelector(".pages").style.maxWidth = v + "px"; };
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
-  const chapterMetaForEngagement = chaptersFor(w).find((item) => item.number === Number(ch));
-  window.GALAXITE_ENGAGEMENT?.bindChapterHeart?.(w.id || slug(w), ch, chapterMetaForEngagement?.id || null);
   const pageBox = document.querySelector(".pages");
   if (pageBox && window.GALAXITE_DB_CATALOG) {
     const chapterMeta = chaptersFor(w).find((item) => item.number === Number(ch));
@@ -342,6 +335,14 @@ function route() {
     return;
   }
   const p = location.hash.slice(2).split("/");
+  const readerMode = p[0] === "r";
+  document.body.classList.toggle("gx-reader-mode", readerMode);
+  if (!readerMode) {
+    window.GALAXITE_READER_UI_CLEANUP?.();
+    window.GALAXITE_READER_CLEANUP?.();
+    document.querySelector(".fab")?.remove();
+    if (window.__auto) { clearInterval(window.__auto); window.__auto = 0; }
+  }
   window.scrollTo(0, 0);
   document.title = "Galaxite | مانجا ومانهوا";
   if (p[0] === "admin") { document.title = "لوحة الإدارة | Galaxite"; window.GALAXITE_RENDER_ADMIN?.(); post(p); return; }
