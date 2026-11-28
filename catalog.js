@@ -88,14 +88,16 @@
         .eq("chapter_number", Number(chapterNumber)).maybeSingle();
       if (chapterError || !chapter?.is_published) return [];
       const { data: pages, error: pagesError } = await db.from("site_chapter_pages")
-        .select("page_number,storage_path").eq("chapter_id", chapter.id)
+        .select("page_number,storage_path,image_url").eq("chapter_id", chapter.id)
         .order("page_number", { ascending: true });
       if (pagesError || !Array.isArray(pages) || !pages.length) return [];
-      const signed = await Promise.all(pages.map(async (page) => {
+      const resolved = await Promise.all(pages.map(async (page) => {
+        if (page.image_url) return { page: page.page_number, url: page.image_url };
+        if (!page.storage_path) return null;
         const { data, error } = await db.storage.from("galaxite-chapters").createSignedUrl(page.storage_path, 3600);
         return error ? null : { page: page.page_number, url: data?.signedUrl || "" };
       }));
-      return signed.filter((item) => item?.url).sort((x, y) => x.page - y.page).map((item) => item.url);
+      return resolved.filter((item) => item?.url).sort((x, y) => x.page - y.page).map((item) => item.url);
     } catch (error) {
       console.warn("Chapter pages unavailable.", error);
       return [];
