@@ -337,4 +337,30 @@ else route();
 
 document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#q").focus(); } });
 
+(() => {
+  const header = document.querySelector(".head");
+  if (!header) return;
+  let lastY = window.scrollY || 0;
+  let ticking = false;
+  const update = () => {
+    const mobile = window.matchMedia("(max-width: 1100px)").matches;
+    const y = window.scrollY || 0;
+    if (!mobile || y < 48 || y < lastY - 6) {
+      header.classList.remove("gx-head-hidden");
+    } else if (y > lastY + 5) {
+      header.classList.add("gx-head-hidden");
+    }
+    lastY = y;
+    ticking = false;
+  };
+  window.addEventListener("scroll", () => {
+    if (!ticking) {
+      ticking = true;
+      window.requestAnimationFrame(update);
+    }
+  }, { passive: true });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 1100) header.classList.remove("gx-head-hidden");
+  }, { passive: true });
+})();
 (() => { const b = document.createElement("button"); b.id = "top"; b.setAttribute("aria-label", "للأعلى"); b.textContent = "↑"; b.hidden = true; b.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" }); document.body.appendChild(b); addEventListener("scroll", () => { b.hidden = scrollY < 600; }, { passive: true }); })();
