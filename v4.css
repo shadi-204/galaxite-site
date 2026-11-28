@@ -35,9 +35,10 @@
 }
 
 /* Password visibility control: align the eye with the physical right edge of LTR password fields. */
-.authpw{position:relative;display:block;width:100%;direction:ltr}
-.authpw input{width:100%;padding-right:48px!important;padding-left:12px!important;padding-inline-start:12px!important;padding-inline-end:48px!important;box-sizing:border-box}
-.authpw-toggle{position:absolute;right:8px!important;left:auto!important;inset-inline-end:8px;inset-inline-start:auto;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:transparent;color:var(--mut);cursor:pointer;z-index:2}
+/* Keep the password eye on the physical RIGHT edge in RTL and LTR layouts. */
+.authform .authpw{position:relative!important;display:block!important;width:100%!important;direction:ltr!important;}
+.authform .authpw>input{display:block;width:100%;box-sizing:border-box;padding-right:52px!important;padding-left:12px!important;}
+.authform .authpw>.authpw-toggle{position:absolute!important;inset:50% 8px auto auto!important;left:auto!important;right:8px!important;transform:translateY(-50%)!important;margin:0!important;width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;display:grid!important;place-items:center;padding:0!important;border:0!important;border-radius:8px;background:transparent;color:var(--mut);cursor:pointer;z-index:5;}
 .authpw-toggle:hover{color:var(--txt);background:var(--card)}
 .authpw-toggle:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .authpw-toggle .eye-closed{display:none}
