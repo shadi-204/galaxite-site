@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const PUBLISHABLE_KEY = "sb_publishable_0_SCF5uAaN3b9oQECQLHeQ_OZwbwfN7";
 const ALLOWED_ORIGINS = new Set([
   "https://galaxite-preview.pages.dev",
   "https://galaxitescans.com",
@@ -109,6 +110,7 @@ Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { status: 204, headers: cors });
   if (origin && !ALLOWED_ORIGINS.has(origin)) return reply(403, { error: "origin_not_allowed" }, cors);
   if (request.method !== "POST") return reply(405, { error: "method_not_allowed" }, cors);
+  if (request.headers.get("apikey") !== PUBLISHABLE_KEY) return reply(401, { error: "invalid_project_key" }, cors);
 
   try {
     const body = await request.json().catch(() => ({}));
