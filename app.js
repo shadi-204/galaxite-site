@@ -120,7 +120,7 @@ function series(w) {
       : "";
     const chapterMeta = [
       number === latest ? '<em class="new">● جديد</em>' : "",
-      publishedDate ? `<time class="chapter-date" datetime="${esc(chapter.created_at)}">${esc(publishedDate)}</time>` : "",
+      publishedDate ? `<time class="chapter-date" datetime="${esc(chapter.source_published_at)}">${esc(publishedDate)}</time>` : "",
       premium ? (locked ? "مميز" : "مفتوح") : "",
       (prog[w.title] || 0) === number ? "وصلت هنا" : ""
     ].filter(Boolean).join(" · ");
