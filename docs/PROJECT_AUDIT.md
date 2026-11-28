@@ -71,3 +71,11 @@
 - Browser end-to-end testing, real Owner login, storage uploads/signed URL checks, and RLS denial tests still require a browser session and are not certified by this build.
 - The purchased sample chapter has been stitched locally into 17 sequential parts from 88 original image files; it has not yet been uploaded to Supabase or published in the reader.
 - OCR, text detection, image cleaning/inpainting, Arabic translation/typesetting, and the worker runtime are still not implemented or deployed. The static build must not be mistaken for completion of the localization pipeline.
+
+## Chapter 24 OCR pilot check — 2026-11-28
+
+- The purchased test set has 88 original WebP pages. The stitched long-scroll version is only a review artifact; OCR coordinates must reference the original pages.
+- A local Tesseract 5 diagnostic was run against sample originals. It missed the stylized DAMN!! bubble on page 040, misread words in the lower dialogue, and failed to reliably read the Korean sound effects on page 020. Tesseract is therefore rejected as the production OCR engine for this art style.
+- The next candidate is PP-OCRv5 Korean recognition (documented to support both Korean and English), combined with manga-oriented text-region/bubble detection. It has not yet been installed, benchmarked on this chapter, or deployed.
+- No page images have been uploaded to Supabase; the chapter remains a local test asset. No OCR, inpainting, translation, lettering, or auto-publishing worker is deployed.
+- Detailed processing stages and pilot acceptance checks are in docs/OCR_PIPELINE_DESIGN.md.
