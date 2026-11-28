@@ -60,6 +60,7 @@ async function getSdk() {
       signIn: async (e, pw) => ok(await c.auth.signInWithPassword({ email: e, password: pw })).user.email,
       google: async () => { ok(await c.auth.signInWithOAuth({ provider: "google" })); return null; },
       reset: async (e) => ok(await c.auth.resetPasswordForEmail(e)),
+      resend: async (e) => ok(await c.auth.resend({ type: "signup", email: e })),
       signOut: () => c.auth.signOut(),
       current: async () => (await c.auth.getSession()).data.session?.user?.email || null
     };
@@ -154,7 +155,7 @@ function loginPage(next) {
     pwToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور");
   };
   document.querySelectorAll(".seg button").forEach((b) => (b.onclick = () => { mode = b.dataset.m; loginPage(next); }));
-  const err = (t) => { const e = $("#ae-err"); e.textContent = t; e.hidden = !t; };
+  const err = (t) => { document.getElementById("resend-confirmation")?.remove(); const e = $("#ae-err"); e.textContent = t; e.hidden = !t; };
   const submit = async () => {
     err("");
     const email = $("#ae").value.trim().toLowerCase(), pw = $("#ap").value, name = $("#an")?.value.trim();
@@ -216,6 +217,28 @@ function loginPage(next) {
       }
       if (!msg) msg = "حصلت مشكلة أثناء تسجيل الدخول أو إنشاء الحساب. راجع البيانات وحاول مرة أخرى.";
       err(msg);
+      if (code === "email_not_confirmed" || lower.includes("email not confirmed") || lower.includes("email_not_confirmed")) {
+        const resend = document.createElement("button");
+        resend.id = "resend-confirmation";
+        resend.type = "button";
+        resend.className = "lnk";
+        resend.textContent = "إعادة إرسال رسالة التأكيد";
+        resend.onclick = async () => {
+          resend.disabled = true;
+          resend.textContent = "جارٍ الإرسال...";
+          try {
+            await (await getSdk()).resend(email);
+            err("طلبنا إرسال رسالة تأكيد جديدة. راجع صندوق الوارد والرسائل غير المرغوب فيها.");
+          } catch (resendError) {
+            console.warn("Galaxite confirmation resend failed:", resendError);
+            err("تعذر إرسال رسالة التأكيد الآن. حاول لاحقًا أو راجع إعدادات البريد.");
+            resend.disabled = false;
+            resend.textContent = "إعادة إرسال رسالة التأكيد";
+            $("#ae-err").insertAdjacentElement("afterend", resend);
+          }
+        };
+        $("#ae-err").insertAdjacentElement("afterend", resend);
+      }
       btn.disabled = false;
       btn.textContent = mode === "in" ? "دخول" : "إنشاء الحساب";
     }
