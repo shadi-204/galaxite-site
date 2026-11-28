@@ -544,6 +544,11 @@ function profilePage(WORKS, slugf) {
   };
 }
 
-window.VX = { toast, level, me, locked, premium, lockedScreen, loginPage, passwordRecoveryPage, profilePage, storePage, track, refreshHead, reveal, tilt, confetti, claimDaily, logout, restore, I, coin, LOCK_COST };
+window.VX = {
+  toast, level, me, locked, premium, lockedScreen, loginPage,
+  openAuth: (nextMode) => { mode = nextMode === "up" ? "up" : "in"; loginPage(); },
+  passwordRecoveryPage, profilePage, storePage, track, refreshHead,
+  reveal, tilt, confetti, claimDaily, logout, restore, I, coin, LOCK_COST
+};
 document.addEventListener("DOMContentLoaded", () => { refreshHead(); restore(); });
 })();
