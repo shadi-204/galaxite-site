@@ -38,11 +38,19 @@ function cats() {
 }
 /* ---- أحدث الفصول ---- */
 let lt = "all";
-function latest() {
-  const l = latestList().filter((x) => lt === "all" || x.w.type === lt);
-  $("#app").innerHTML = `<h2 class="v4h"><span></span>أحدث الفصول</h2><div class="v4tabs">${[["all", "الكل"], ["manga", "مانجا"], ["manhwa", "مانهوا"]].map(([k, v]) => `<button class="${lt === k ? "on" : ""}" data-t="${k}">${v}</button>`).join("")}</div>
-  <div class="v4lat">${l.map(({ w, ch, ago }) => `<a class="v4lc" href="#/r/${slug(w)}/${ch}"><div class="v4th">${cover(w)}</div><div><b dir="auto">${esc(w.title)}</b><small>الفصل ${nm(ch)}</small><small>بيانات الفصل</small></div></a>`).join("")}</div>`;
+async function latest() {
+  $("#app").innerHTML = `<h2 class="v4h"><span></span>أحدث الفصول</h2><div class="v4tabs">${[["all", "الكل"], ["manga", "مانجا"], ["manhwa", "مانهوا"]].map(([k, v]) => `<button class="${lt === k ? "on" : ""}" data-t="${k}">${v}</button>`).join("")}</div><p class="v4sub">جارٍ تحميل أحدث الفصول المنشورة...</p><div class="v4lat" id="v4-latest-list"></div>`;
   document.querySelectorAll(".v4tabs button").forEach((b) => (b.onclick = () => { lt = b.dataset.t; latest(); }));
+  const list = $("#v4-latest-list");
+  if (!list) return;
+  const rows = await window.GALAXITE_DB_CATALOG?.getLatestChapters(60) || [];
+  if (!list.isConnected) return;
+  const entries = rows.map((row) => ({ row, w: WORKS.find((work) => String(work.id) === String(row.work_id)) })).filter((x) => x.w && (lt === "all" || x.w.type === lt));
+  list.innerHTML = entries.length ? entries.map(({row,w}) => {
+    const stamp = row.created_at ? new Date(row.created_at).toLocaleDateString("ar-EG") : "تاريخ غير متاح";
+    const chapterTitle = row.title || ("الفصل " + nm(row.chapter_number));
+    return `<a class="v4lc" href="#/r/${slug(w)}/${Number(row.chapter_number)}"><div class="v4th">${cover(w)}</div><div><b dir="auto">${esc(w.title)}</b><small>${esc(chapterTitle)}</small><small>${stamp}</small></div></a>`;
+  }).join("") : '<p class="empty">لا توجد فصول منشورة متاحة في قاعدة البيانات.</p>';
 }
 /* ---- الأعلى تقييمًا ---- */
 function rankBlock(el) {
