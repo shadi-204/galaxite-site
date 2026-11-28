@@ -415,7 +415,7 @@ def run_once() -> int:
     if not url.startswith("https://"):
         raise SystemExit("SUPABASE_URL must use HTTPS.")
     worker_id = os.getenv("WORKER_ID", f"galaxite-gha-{uuid.uuid4().hex[:10]}")
-    max_jobs = max(1, min(5, int(os.getenv("MAX_JOBS_PER_RUN", "1"))))
+    max_jobs = max(1, min(30, int(os.getenv("MAX_JOBS_PER_RUN", "1"))))
     supabase = Supabase(url, key)
     LOG.info("Galaxite scheduled worker starting: %s (max_jobs=%s)", worker_id, max_jobs)
     schedule_discovery(supabase)
