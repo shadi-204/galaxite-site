@@ -151,6 +151,8 @@ def _source_manifest(source: dict[str, Any]) -> tuple[dict[str, Any], str]:
 
 def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
     """Discover one Asura browse page per job to keep each run bounded."""
+    if source.get("authorization_status") != "authorized" or not source.get("enabled"):
+        raise WorkerError("Asura source is not enabled and authorized.")
     page = max(1, int((job.get("payload") or {}).get("page") or 1))
     max_pages = max(1, min(30, int(os.getenv("ASURA_BROWSE_PAGES", "22"))))
     browse_url = f"https://asurascans.com/browse?page={page}"
