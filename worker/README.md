@@ -39,7 +39,11 @@ The `asura_scans` adapter reads the public browse pages (`/browse?page=N`), comi
 
 For Asura, register `base_url=https://asurascans.com/comics` and `adapter_key=asura_scans`. Keep the source disabled until the private worker is deployed and its health has been verified. The database currently has duplicate legacy Asura source rows; consolidate to one enabled row before starting live ingestion.
 
-## Deploy in a private worker service
+## Run through free GitHub Actions
+
+See [DEPLOYMENT.md](DEPLOYMENT.md). The scheduled workflow uses a bounded one-shot run, one job per invocation, and repository Actions secrets. GitHub hourly scheduling only activates when the workflow exists on the repository default branch; manual runs can target `galaxite-preview` during testing.
+
+## Legacy continuous worker mode
 
 Use Python 3.11+ and install:
 
