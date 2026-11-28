@@ -4,7 +4,7 @@ const nm = (n) => Number(n).toLocaleString("ar-EG");
 const seed = (s) => { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
 const hue = (t) => seed(t) % 360;
 const grad = (t) => `linear-gradient(135deg,hsl(${hue(t)},60%,40%),hsl(${(hue(t) + 60) % 360},55%,22%))`;
-const GEN = [...new Set(WORKS.flatMap((w) => w.genres || []))];
+const getGenres = () => [...new Set(WORKS.flatMap((w) => w.genres || []))].sort((a, b) => a.localeCompare(b));
 const pop = (w) => Number(w.rating || 0);
 const latestList = () => WORKS.map((w) => ({ w, ch: w.chapters, ago: null })).sort((a, b) => b.ch - a.ch);
 const agoTxt = (m) => (m < 60 ? `منذ ${nm(m)} د` : m < 1440 ? `منذ ${nm(Math.round(m / 60))} س` : `منذ ${nm(Math.round(m / 1440))} يوم`);
@@ -22,7 +22,7 @@ function browse() {
    <b>الحالة</b><div>${chip("st", "", "الكل")}${chip("st", "مستمر", "مستمر")}${chip("st", "مكتمل", "مكتمل")}</div>
    <b>النوع</b><div>${chip("ty", "", "الكل")}${chip("ty", "manga", "مانجا")}${chip("ty", "manhwa", "مانهوا")}</div>
    <b>الترتيب</b><div>${chip("sort", "rating", "الأعلى تقييما")}${chip("sort", "pop", "الأكثر شعبية")}${chip("sort", "ch", "الأكثر فصولا")}${chip("sort", "az", "أ-ي")}</div>
-   <b>التصنيفات</b><div>${GEN.map((g) => `<button class="v4chip ${bf.g.includes(g) ? "on" : ""}" data-g="${g}">${g}</button>`).join("")}</div>
+   <b>التصنيفات</b><div>${getGenres().map((g) => `<button class="v4chip ${bf.g.includes(g) ? "on" : ""}" data-g="${g}">${g}</button>`).join("")}</div>
    <button class="v4chip" id="v4rs">مسح الكل</button></aside>
   <section><input id="v4q" class="v4q" type="search" placeholder="ابحث عن عمل..." value="${esc(bf.q)}"><p class="v4cnt">عدد النتائج: <b>${nm(list.length)}</b></p>
   <div class="v4grid">${list.map((w) => card(w, `<b class="rate">★ ${w.rating}</b>`)).join("") || `<p class="empty">لا نتائج</p>`}</div></section></div>`;
@@ -33,7 +33,7 @@ function browse() {
 }
 /* ---- التصنيفات ---- */
 function cats() {
-  $("#app").innerHTML = `<h2 class="v4h"><span></span>التصنيفات</h2><p class="v4sub">تصفح الأعمال حسب التصنيف.</p><div class="v4cats">${GEN.map((g) => { const n = WORKS.filter((w) => (w.genres || []).includes(g)); return `<a class="v4cat" href="#/browse" data-g="${g}" style="background:${grad(g)}"><b>${g}</b><small>${nm(n.length)} عمل</small><em>تصفح ‹</em></a>`; }).join("")}</div>`;
+  $("#app").innerHTML = `<h2 class="v4h"><span></span>التصنيفات</h2><p class="v4sub">تصفح الأعمال حسب التصنيف.</p><div class="v4cats">${getGenres().map((g) => { const n = WORKS.filter((w) => (w.genres || []).includes(g)); return `<a class="v4cat" href="#/browse" data-g="${g}" style="background:${grad(g)}"><b>${g}</b><small>${nm(n.length)} عمل</small><em>تصفح ‹</em></a>`; }).join("")}</div>`;
   document.querySelectorAll(".v4cat").forEach((a) => (a.onclick = () => { bf = { q: "", st: "", ty: "", sort: "rating", g: [a.dataset.g] }; }));
 }
 /* ---- أحدث الفصول ---- */
@@ -95,7 +95,7 @@ function enrich() {
   if (location.hash && location.hash !== "#/" && location.hash !== "#") return;
   const a = $("#app"); if (!a.querySelector(".gstrip, .row, .hero") || a.querySelector("#v4home")) return;
   const d = document.createElement("div"); d.id = "v4home";
-  d.innerHTML = `<section id="rk4"></section><div class="rh"><h3 class="h">التصنيفات</h3><a href="#/cats" class="v4more">عرض الكل</a></div><div class="v4cats sm">${GEN.slice(0, 6).map((g) => `<a class="v4cat" href="#/cats" style="background:${grad(g)}"><b>${g}</b></a>`).join("")}</div><div class="v4cta"><b>ادعم الموقع واجمع النقاط</b><span><a class="cta" href="#/missions">المهام</a> <a class="cta alt" href="#/support">ادعمنا</a></span></div>`;
+  d.innerHTML = `<section id="rk4"></section><div class="rh"><h3 class="h">التصنيفات</h3><a href="#/cats" class="v4more">عرض الكل</a></div><div class="v4cats sm">${getGenres().slice(0, 6).map((g) => `<a class="v4cat" href="#/cats" style="background:${grad(g)}"><b>${g}</b></a>`).join("")}</div><div class="v4cta"><b>ادعم الموقع واجمع النقاط</b><span><a class="cta" href="#/missions">المهام</a> <a class="cta alt" href="#/support">ادعمنا</a></span></div>`;
   a.appendChild(d); rankBlock(d.querySelector("#rk4"));
 }
 new MutationObserver(() => { if (!$("#v4home")) enrich(); }).observe($("#app"), { childList: true });
