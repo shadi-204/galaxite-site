@@ -367,3 +367,16 @@ body.gx-reader-mode .fab.gx-controls-hidden {
   body.gx-reader-mode .pages { width:100%!important; max-width:100%!important; }
   body.gx-reader-mode .pages img { width:100%!important; max-width:100%!important; }
 }
+
+/* Hide the reader's chapter navigation while scrolling down on phones; show it on scroll-up. */
+@media (max-width: 640px) {
+  body.gx-reader-mode .reader-topbar {
+    transition: transform .22s ease, opacity .22s ease;
+    will-change: transform;
+  }
+  body.gx-reader-mode .reader-topbar.gx-reader-nav-hidden {
+    transform: translateY(calc(-100% - 4px)) !important;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
