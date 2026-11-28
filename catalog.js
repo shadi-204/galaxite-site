@@ -1,6 +1,6 @@
 /* Fast Galaxite catalog: cached work cards first, chapter metadata on demand. */
 (() => {
-  const WORKS_CACHE_KEY = "galaxite:catalog:works:v3";
+  const WORKS_CACHE_KEY = "galaxite:catalog:works:v4";
   const CHAPTER_CACHE_KEY = "galaxite:catalog:chapters:v5";
   const PAGE_URL_CACHE_KEY = "galaxite:reader:page-urls:v1";
   const PAGE_URL_CACHE_TTL = 45 * 60 * 1000;
@@ -48,7 +48,8 @@
       desc: w.description || w.desc || "",
       chapters: Number(w.chapter_count || w.chapters || 0),
       cover: w.cover_url || w.cover || "",
-      sort_order: Number(w.sort_order || 0)
+      sort_order: Number(w.sort_order || 0),
+      source_updated_at: w.source_updated_at || null
     }));
   }
 
@@ -186,7 +187,7 @@
         const workRows = [];
         while (true) {
           const result = await db.from("site_works")
-            .select("id,title,type,genres,rating,status,description,chapter_count,cover_url,sort_order")
+            .select("id,title,type,genres,rating,status,description,chapter_count,cover_url,sort_order,source_updated_at")
             .eq("is_published", true)
             .order("sort_order", { ascending: true })
             .range(offset, offset + pageSize - 1);
@@ -223,9 +224,10 @@
       const db = await getClient();
       if (!db) return [];
       const { data, error } = await db.from("site_chapters")
-        .select("work_id,chapter_number,title,display_title,source_published_at,created_at")
+        .select("work_id,chapter_number,title,display_title,source_published_at")
         .eq("is_published", true)
-        .order("created_at", { ascending: false })
+        .not("source_published_at", "is", null)
+        .order("source_published_at", { ascending: false, nullsFirst: false })
         .limit(limit);
       if (error) throw error;
       return Array.isArray(data) ? data : [];
