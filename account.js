@@ -114,7 +114,13 @@ const isVip = (u) => u && u.vipUntil > Date.now();
 const today = () => new Date().toISOString().slice(0, 10);
 
 /* ---------- الفصول المقفولة ---------- */
-const premium = (w, ch) => w.premiumFrom ? ch >= w.premiumFrom : (w.status === "مستمر" && w.chapters > 10 && ch > w.chapters - LOCK_LAST);
+const premium = (w, ch) => {
+  if (Array.isArray(w.publishedChapters)) {
+    const row = w.publishedChapters.find((item) => Number(item.chapter_number ?? item.number) === Number(ch));
+    return row ? Boolean(row.is_premium) : false;
+  }
+  return w.premiumFrom ? ch >= w.premiumFrom : (w.status === "مستمر" && w.chapters > 10 && ch > w.chapters - LOCK_LAST);
+};
 const lockKey = (w, ch) => w.title + "#" + ch;
 const locked = (w, ch) => { if (!premium(w, ch)) return false; const u = me(); return !(u && (isVip(u) || u.unlocked.includes(lockKey(w, ch)))); };
 
