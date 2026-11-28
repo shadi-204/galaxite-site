@@ -170,7 +170,7 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
         title = (detail.get("title") or "").strip()
         if not title:
             title = re.sub(r"-7de80a82$", "", entry["slug"], flags=re.I).replace("-", " ").title()
-        if not title or re.fullmatch(r"\\d+(?:\\.\\d+)?", title):
+        if not title or re.fullmatch(r"\d+(?:\.\d+)?", title):
             continue
 
         encoded_title = __import__("urllib.parse", fromlist=["quote"]).quote(title, safe="")
