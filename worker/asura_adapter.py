@@ -21,6 +21,7 @@ class _PageParser(HTMLParser):
         self.metas = {}
         self.anchors = []
         self.images = []
+        self.text = []
         self._anchor = None
 
     def handle_starttag(self, tag, attrs):
@@ -46,8 +47,11 @@ class _PageParser(HTMLParser):
                     self.images.append(attrs[key].strip())
 
     def handle_data(self, data):
-        if self._anchor is not None and data.strip():
-            self._anchor["text"].append(data.strip())
+        clean = data.strip()
+        if clean:
+            self.text.append(clean)
+        if self._anchor is not None and clean:
+            self._anchor["text"].append(clean)
 
     def handle_endtag(self, tag):
         if tag.lower() == "a" and self._anchor is not None:
@@ -116,12 +120,25 @@ def parse_detail(html: str, page_url: str) -> dict:
             "url": absolute,
         }
     description = parser.metas.get("og:description") or parser.metas.get("description") or ""
+    page_text = " ".join(parser.text)
+    status_match = re.search(r"\\bStatus\\s+(ongoing|completed|hiatus|dropped)\\b", page_text, re.I)
+    status_map = {
+        "ongoing": "مستمر",
+        "completed": "مكتمل",
+        "hiatus": "متوقف",
+        "dropped": "دروب",
+    }
+    status = status_map.get(status_match.group(1).lower(), "مستمر") if status_match else "مستمر"
+    type_match = re.search(r"\\bType\\s+(manhwa|manga|manhua)\\b", page_text, re.I)
+    type_map = {"manhwa": "مانهوا", "manga": "مانجا", "manhua": "مانهوا"}
+    work_type = type_map.get(type_match.group(1).lower(), "مانهوا") if type_match else "مانهوا"
     return {
         "title": title[:300],
         "description": description[:5000],
         "cover_url": cover,
         "chapters": sorted(chapters.values(), key=lambda x: x["number"]),
-        "type": "مانهوا",
+        "type": work_type,
+        "status": status,
         "genres": [],
     }
 
