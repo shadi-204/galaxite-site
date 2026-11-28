@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "galaxite-mobile-";
-const V = CACHE_PREFIX + "v19";
+const V = CACHE_PREFIX + "v20";
 const FILES = [
   "./",
   "./index.html",
