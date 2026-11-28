@@ -152,7 +152,7 @@ function catalogUnavailable() {
 }
 function route() {
   if (window.GALAXITE_PASSWORD_RECOVERY) {
-    window.VX?.passwordRecoveryPage?.();
+    window.GALAXITE_SHOW_PASSWORD_RECOVERY?.();
     return;
   }
   const p = location.hash.slice(2).split("/");
