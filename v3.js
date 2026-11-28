@@ -154,6 +154,39 @@ readerInit = function (w, ch) {
   const pages = document.querySelector(".pages");
   if (!$("#cj") || !pages) return;
 
+  const AUTO_SPEED_KEY = "galaxite:reader:auto-scroll-speed";
+  const readAutoSpeed = () => {
+    try {
+      const saved = Number(localStorage.getItem(AUTO_SPEED_KEY));
+      return Number.isFinite(saved) && saved >= 0.5 && saved <= 12 ? saved : 2;
+    } catch {
+      return 2;
+    }
+  };
+  let autoScrollSpeed = readAutoSpeed();
+  const updateSpeedLabels = () => {
+    const shown = nm(Number(autoScrollSpeed.toFixed(1)));
+    const speedHint = "السرعة الحالية: " + shown;
+    [$("#zi"), $("#f-zi")].filter(Boolean).forEach((button) => {
+      button.title = "تسريع التمرير التلقائي · " + speedHint;
+      button.setAttribute("aria-label", "تسريع التمرير التلقائي · " + speedHint);
+    });
+    [$("#zo"), $("#f-zo")].filter(Boolean).forEach((button) => {
+      button.title = "إبطاء التمرير التلقائي · " + speedHint;
+      button.setAttribute("aria-label", "إبطاء التمرير التلقائي · " + speedHint);
+    });
+  };
+  const changeAutoSpeed = (amount) => {
+    autoScrollSpeed = Math.max(0.5, Math.min(12, Math.round((autoScrollSpeed + amount) * 10) / 10));
+    window.GALAXITE_AUTO_SCROLL_SPEED = autoScrollSpeed;
+    try { localStorage.setItem(AUTO_SPEED_KEY, String(autoScrollSpeed)); } catch {}
+    updateSpeedLabels();
+  };
+  window.GALAXITE_AUTO_SCROLL_SPEED = autoScrollSpeed;
+  $("#zi").onclick = () => changeAutoSpeed(0.5);
+  $("#zo").onclick = () => changeAutoSpeed(-0.5);
+  updateSpeedLabels();
+
   document.querySelector(".fab")?.remove();
   if (window.__auto) { clearInterval(window.__auto); window.__auto = 0; }
 
@@ -163,8 +196,8 @@ readerInit = function (w, ch) {
   f.innerHTML = `<span class="pc" id="pc">1/1</span>
     <button id="f-dn" aria-label="نزول">${IC.down}</button>
     <button id="f-ls" aria-label="الفصول">${IC.list}</button>
-    <button id="f-zi" aria-label="تكبير">${IC.plus}</button>
-    <button id="f-zo" aria-label="تصغير">${IC.minus}</button>
+    <button id="f-zi" aria-label="تسريع التمرير التلقائي">${IC.plus}</button>
+    <button id="f-zo" aria-label="إبطاء التمرير التلقائي">${IC.minus}</button>
     <button id="f-fs" aria-label="ملء الشاشة">${IC.full}</button>
     <button id="f-pl" aria-label="تمرير تلقائي">${IC.play}</button>
     <button id="f-up" aria-label="للأعلى">${IC.up}</button>`;
@@ -220,7 +253,7 @@ readerInit = function (w, ch) {
       window.__auto = 0;
       $("#f-pl").innerHTML = IC.play;
     } else {
-      window.__auto = setInterval(() => scrollBy(0, 2), 16);
+      window.__auto = setInterval(() => scrollBy(0, autoScrollSpeed), 16);
       $("#f-pl").innerHTML = IC.pause;
     }
   };
