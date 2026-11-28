@@ -13,12 +13,24 @@ const norm = (s) => String(s).toLowerCase().replace(/[\u064B-\u0652\u0640]/g, ""
 const hit = (w, q) => !q || (!norm(q) ? [w.title, w.desc || ""].some((f) => String(f).toLowerCase().includes(q.toLowerCase())) : [w.title, ...(w.genres || []), w.desc || ""].some((f) => norm(f).includes(norm(q))));
 const byTitle = (t) => WORKS.find((w) => w.title === t);
 const slug = (w) => encodeURIComponent(w.title);
+const chaptersFor = (w) => {
+  if (Array.isArray(w.publishedChapters)) {
+    return w.publishedChapters
+      .map((chapter) => ({ ...chapter, number: Number(chapter.chapter_number ?? chapter.number) }))
+      .filter((chapter) => Number.isFinite(chapter.number) && chapter.number > 0)
+      .sort((x, y) => y.number - x.number);
+  }
+  return Array.from({ length: Math.max(0, Number(w.chapters) || 0) }, (_, i) => ({
+    number: Number(w.chapters) - i,
+    is_premium: null
+  }));
+};
 function cover(w, cls = "") {
   return w.cover ? `<img class="cover ${cls}" src="${esc(w.cover)}" alt="" loading="lazy">`
     : `<div class="cover art ${cls}" style="background:${grad(w.title)};--h:${hue(w.title)}"><b class="ini">${esc([...w.title][0].toUpperCase())}</b><span>${esc(w.title)}</span></div>`;
 }
 function cardM(w) {
-  return card(w, `<b class="rate">⭐ ${w.rating}</b>`).replace(/<\/a>$/, `<span class="meta"><i>${w.chapters} فصل</i><i class="${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</i></span></a>`);
+  return card(w, `<b class="rate">⭐ ${w.rating}</b>`).replace(/<\/a>$/, `<span class="meta"><i>${Array.isArray(w.publishedChapters) ? w.publishedChapters.length : w.chapters} فصل</i><i class="${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</i></span></a>`);
 }
 function rowOf(title, list) {
   return `<div class="rh"><h3 class="h">${title}</h3><span class="arr"><button data-d="1" aria-label="السابق">›</button><button data-d="-1" aria-label="التالي">‹</button></span></div><div class="row">${list.map(cardM).join("")}</div>`;
@@ -37,11 +49,11 @@ function home() {
   if (!q) h += `<section class="hero" id="hero"></section>`;
   if (!q && cont.length) h += `<h3 class="h">أكمل القراءة</h3><div class="row">${cont.map((t) => { const w = byTitle(t); return `<a class="card" href="#/r/${slug(w)}/${prog[t]}">${cover(w)}<b class="rate">ف ${prog[t]}</b><span class="name" dir="auto">${esc(t)}</span></a>`; }).join("")}</div>`;
   if (!q && favs.length) h += `<h3 class="h">المفضلة</h3><div class="row">${favs.map((t) => card(byTitle(t))).join("")}</div>`;
-  if (!q) h += `<div class="stat3"><div><b data-to="${WORKS.length}">0</b><span>عمل</span></div><div><b data-to="${WORKS.reduce((a, w) => a + w.chapters, 0)}">0</b><span>فصل</span></div><div><b data-to="${new Set(WORKS.flatMap((w) => w.genres)).size}">0</b><span>تصنيف</span></div></div><h3 class="h">تصفح بالنوع</h3><div class="gstrip">${[...new Set(WORKS.flatMap((w) => w.genres))].map((g) => `<button class="gchip" data-gg="${esc(g)}">${esc(g)}</button>`).join("")}</div>`;
+  if (!q) h += `<div class="stat3"><div><b data-to="${WORKS.length}">0</b><span>عمل</span></div><div><b data-to="${WORKS.reduce((a, w) => a + (Array.isArray(w.publishedChapters) ? w.publishedChapters.length : w.chapters), 0)}">0</b><span>فصل</span></div><div><b data-to="${new Set(WORKS.flatMap((w) => w.genres)).size}">0</b><span>تصنيف</span></div></div><h3 class="h">تصفح بالنوع</h3><div class="gstrip">${[...new Set(WORKS.flatMap((w) => w.genres))].map((g) => `<button class="gchip" data-gg="${esc(g)}">${esc(g)}</button>`).join("")}</div>`;
   h += rowOf("الأكثر شعبية", [...list].sort((a, b) => b.rating - a.rating));
   if (!q) h += rowOf("اختيارات المحرر", [...list].filter((w) => w.rating >= 8.5).sort((a, b) => a.title.localeCompare(b.title)));
   if (!q) h += `<h3 class="h">أفضل 10</h3><ol class="top10">${[...WORKS].sort((a, b) => b.rating - a.rating).slice(0, 10).map((w, i) => `<li><a href="#/s/${slug(w)}"><b class="num">${i + 1}</b>${cover(w, "sm")}<span><i dir="auto">${esc(w.title)}</i><small>${kind(w)} · ⭐ ${w.rating}</small></span></a></li>`).join("")}</ol>`;
-  h += `<h3 class="h">آخر التحديثات</h3><div class="latest">${list.map((w, i) => `<div class="item"><a href="#/s/${slug(w)}">${cover(w, "sm")}</a><div><a class="t" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>${[0, 1, 2].map((k) => `<a class="ch" href="#/r/${slug(w)}/${w.chapters - k}"><span>الفصل ${w.chapters - k}</span><small>${k === 0 && i % 2 === 0 ? '<em class="new">● جديد</em>' : ago[(i + k) % ago.length]}</small></a>`).join("")}</div></div>`).join("")}</div>`;
+  h += `<h3 class="h">آخر التحديثات</h3><div class="latest">${list.map((w, i) => { const chapters = chaptersFor(w).slice(0, 3); return `<div class="item"><a href="#/s/${slug(w)}">${cover(w, "sm")}</a><div><a class="t" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>${chapters.map((chapter, k) => `<a class="ch" href="#/r/${slug(w)}/${chapter.number}"><span>الفصل ${chapter.number}</span><small>${k === 0 && i % 2 === 0 ? '<em class="new">● جديد</em>' : ago[(i + k) % ago.length]}</small></a>`).join("")}</div></div>`; }).join("")}</div>`;
   if (!list.length) h += "<p>مفيش نتائج</p>";
   $("#app").innerHTML = h;
   document.querySelectorAll(".gchip").forEach((b) => (b.onclick = () => { flt = { g: [b.dataset.gg], st: "", sort: "rating", min: 0, hideB: false, page: 1 }; location.hash = "#/lib"; }));
@@ -60,32 +72,53 @@ function home() {
 }
 let showAll = false;
 function series(w) {
-  const n = showAll ? w.chapters : Math.min(w.chapters, 50);
+  const chapters = chaptersFor(w);
+  const visible = showAll ? chapters : chapters.slice(0, 50);
+  const oldest = chapters.length ? chapters[chapters.length - 1].number : null;
+  const latest = chapters.length ? chapters[0].number : null;
   $("#app").innerHTML = `<a class="back" href="#/">← رجوع</a>
   <div class="top">${cover(w, "big")}<div><h2 dir="auto">${esc(w.title)}</h2>
   <p><span class="badge">${kind(w)}</span> <span class="badge alt"><i class="dot ${w.status === 'مستمر' ? 'on' : ''}"></i>${esc(w.status)}</span> ⭐ ${w.rating}</p>
   <p>${w.genres.map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p><p>${esc(w.desc)}</p>
-  <a class="cta" href="#/r/${slug(w)}/1">الفصل الأول</a><a class="cta alt" href="#/r/${slug(w)}/${w.chapters}">آخر فصل</a>
+  ${oldest !== null ? `<a class="cta" href="#/r/${slug(w)}/${oldest}">أقدم فصل متاح</a>` : ""}
+  ${latest !== null && latest !== oldest ? `<a class="cta alt" href="#/r/${slug(w)}/${latest}">أحدث فصل متاح</a>` : latest !== null ? `<a class="cta alt" href="#/r/${slug(w)}/${latest}">ابدأ القراءة</a>` : ""}
   ${prog[w.title] ? `<a class="cta alt" href="#/r/${slug(w)}/${prog[w.title]}">أكمل من الفصل ${prog[w.title]}</a>` : ""}
   <button class="cta alt" id="mark">${marks.includes(w.title) ? "★ في المفضلة" : "☆ أضف للمفضلة"}</button><button class="cta alt" id="reportWork" type="button">الإبلاغ عن مشكلة في العمل</button></div></div>
-  <h3 class="h">الفصول (${w.chapters})</h3>
-  <div class="chs">${Array.from({ length: n }, (_, i) => w.chapters - i).map((c) => `<a class="ch" href="#/r/${slug(w)}/${c}"><span>الفصل ${c}</span><small>${VX.premium(w, c) ? (VX.locked(w, c) ? "● مميز" : "○ مفتوح") : ago[c % ago.length]}${(prog[w.title] || 0) === c ? " · وصلت هنا" : ""}</small></a>`).join("")}</div>${w.chapters > 50 ? `<button class="cta alt" id="more" style="margin-top:12px">${showAll ? "عرض أقل" : "عرض كل الفصول (" + w.chapters + ")"}</button>` : ""}`;
+  <h3 class="h">الفصول المتاحة (${chapters.length})</h3>
+  <div class="chs">${visible.map((chapter) => {
+    const number = chapter.number;
+    const premium = VX.premium(w, number);
+    return `<a class="ch" href="#/r/${slug(w)}/${number}"><span>${esc(chapter.title || ("الفصل " + number))}</span><small>${premium ? (VX.locked(w, number) ? "● مميز" : "○ مفتوح") : "متاح"}${(prog[w.title] || 0) === number ? " · وصلت هنا" : ""}</small></a>`;
+  }).join("")}</div>${chapters.length > 50 ? `<button class="cta alt" id="more" style="margin-top:12px">${showAll ? "عرض أقل" : "عرض كل الفصول (" + chapters.length + ")"}</button>` : chapters.length ? "" : '<p class="empty">لسه مفيش فصول منشورة للعمل ده.</p>'}`;
   if ($("#more")) $("#more").onclick = () => { showAll = !showAll; series(w); };
   $("#mark").onclick = () => { marks = marks.includes(w.title) ? marks.filter((t) => t !== w.title) : [...marks, w.title]; store.set("marks", marks); series(w); };
   if ($("#reportWork")) $("#reportWork").onclick = () => window.GalaxiteReports?.open({ targetType: "work", targetId: slug(w), targetTitle: w.title, targetPath: `#/s/${slug(w)}` });
 }
 function reader(w, ch) {
-  ch = Math.max(1, Math.min(w.chapters, ch));
+  const chapters = chaptersFor(w);
+  const numbers = chapters.map((chapter) => chapter.number);
+  if (numbers.length) {
+    if (!numbers.includes(Number(ch))) ch = numbers[0];
+  } else {
+    $("#app").innerHTML = `<a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><p class="empty">لسه مفيش فصول منشورة للعمل ده.</p>`;
+    return;
+  }
+  ch = Number(ch);
   if (VX.locked(w, ch)) return VX.lockedScreen(w, ch, slug(w));
   VX.track(w, ch);
   prog[w.title] = ch; store.set("prog", prog);
+  const currentIndex = numbers.indexOf(ch);
+  const previous = numbers[currentIndex + 1] ?? null;
+  const next = numbers[currentIndex - 1] ?? null;
   const pages = (w.pages && w.pages[ch]) || [];
-  $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${Array.from({ length: w.chapters }, (_, i) => w.chapters - i).map((c) => `<option value="${c}"${c === ch ? " selected" : ""}>الفصل ${c}</option>`).join("")}</select>
+  const chapterTitle = chapters.find((chapter) => chapter.number === ch)?.title || `الفصل ${ch}`;
+  const options = chapters.map((numberRow) => `<option value="${numberRow.number}"${numberRow.number === ch ? " selected" : ""}>${esc(numberRow.title || ("الفصل " + numberRow.number))}</option>`).join("");
+  $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
-  <span>${ch > 1 ? `<a href="#/r/${slug(w)}/${ch - 1}">السابق</a>` : ""}${ch < w.chapters ? `<a href="#/r/${slug(w)}/${ch + 1}">التالي</a>` : ""}</span></div>
+  <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>
   <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="reader-empty"><b>الفصل منشور ببياناته، لكن الصور لم تُرفع بعد.</b><p>هنضيف الصفحات هنا بعد رفعها من لوحة الإدارة.</p></div>`}</div>
-  <div class="rend"><p>نهاية الفصل ${ch}</p>${ch < w.chapters ? `<a class="cta" href="#/r/${slug(w)}/${ch + 1}">الفصل التالي ←</a>` : `<p>وصلت لآخر فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
-  <div class="rbar"><span>${ch > 1 ? `<a href="#/r/${slug(w)}/${ch - 1}">السابق</a>` : ""}${ch < w.chapters ? `<a href="#/r/${slug(w)}/${ch + 1}">التالي</a>` : ""}</span></div>`;
+  <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل الأحدث ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
+  <div class="rbar"><span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>`;
 }
 function readerInit(w, ch) {
   if (!$("#cj")) return;
