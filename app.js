@@ -116,7 +116,7 @@ function reader(w, ch) {
   $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
   <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>
-  <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="reader-empty"><b>الفصل منشور ببياناته، لكن الصور لم تُرفع بعد.</b><p>هنضيف الصفحات هنا بعد رفعها من لوحة الإدارة.</p></div>`}</div>
+  <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="reader-empty"><b>روابط صور الفصل لم تُحدّث بعد.</b><p>هنجلب الروابط الأصلية من المصدر عند طلب تحديث الفصل، من غير حفظ الصور عندنا.</p></div>`}</div>
   <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل الأحدث ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
   <div class="rbar"><span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>`;
 }
@@ -133,7 +133,7 @@ function readerInit(w, ch) {
       if (!pageBox.isConnected) return;
       pageBox.innerHTML = urls.length
         ? urls.map((url, i) => `<img src="${esc(url)}" alt="صفحة ${i + 1}" loading="lazy">`).join("")
-        : '<div class="reader-empty"><b>الفصل منشور ببياناته، لكن الصور لم تُرفع بعد.</b><p>هنضيف الصفحات هنا بعد رفعها من لوحة الإدارة.</p></div>';
+        : '<div class="reader-empty"><b>روابط صور الفصل لم تُحدّث بعد.</b><p>هنجلب الروابط الأصلية من المصدر عند طلب تحديث الفصل، من غير حفظ الصور عندنا.</p></div>';
     });
   }
   window.onscroll = () => { const m = document.documentElement.scrollHeight - innerHeight; const b = $("#pg"); if (b) b.style.width = (m > 0 ? Math.min(100, scrollY / m * 100) : 0) + "%"; else window.onscroll = null; };
