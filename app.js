@@ -159,9 +159,9 @@ function reader(w, ch) {
   const options = chapters.map((numberRow) => `<option value="${numberRow.number}"${numberRow.number === ch ? " selected" : ""}>${esc(numberRow.title || ("الفصل " + numberRow.number))}</option>`).join("");
   $("#app").innerHTML = `<div class="reader-topbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
-  <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>
+  <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الفصل السابق</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الفصل التالي</a>` : ""}</span></div>
   <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="page-loading skel" aria-hidden="true"></div>`}</div>
-  <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل الأحدث ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>`;
+  <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل التالي ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>`;
 }
 function readerInit(w, ch) {
   const previousCleanup = window.GALAXITE_READER_CLEANUP;
@@ -172,6 +172,48 @@ function readerInit(w, ch) {
   $("#cj").onchange = (e) => (location.hash = `#/r/${slug(w)}/${e.target.value}`);
   const z = (d) => { const v = Math.max(360, Math.min(1200, store.get("zoom", 760) + d)); store.set("zoom", v); document.querySelector(".pages").style.maxWidth = v + "px"; };
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
+
+  const readerTopbar = document.querySelector(".reader-topbar");
+  let readerBarLastY = window.scrollY || 0;
+  let readerBarTicking = false;
+  const updateReaderTopbar = () => {
+    const y = window.scrollY || 0;
+    const mobile = window.matchMedia("(max-width: 640px)").matches;
+    if (!readerTopbar?.isConnected) {
+      readerBarTicking = false;
+      return;
+    }
+    if (!mobile || y <= 32 || y < readerBarLastY - 4) {
+      readerTopbar.classList.remove("gx-reader-nav-hidden");
+    } else if (y > readerBarLastY + 4) {
+      readerTopbar.classList.add("gx-reader-nav-hidden");
+    }
+    readerBarLastY = y;
+    readerBarTicking = false;
+  };
+  const onReaderBarScroll = () => {
+    if (readerBarTicking) return;
+    readerBarTicking = true;
+    window.requestAnimationFrame(updateReaderTopbar);
+  };
+  const onReaderBarResize = () => {
+    if (!readerTopbar?.isConnected) return;
+    if (window.innerWidth > 640) {
+      readerTopbar.classList.remove("gx-reader-nav-hidden");
+    }
+  };
+  if (readerTopbar) {
+    window.addEventListener("scroll", onReaderBarScroll, { passive: true });
+    window.addEventListener("resize", onReaderBarResize, { passive: true });
+    readerTopbar.classList.remove("gx-reader-nav-hidden");
+  }
+  const removeReaderTopbarScroll = () => {
+    window.removeEventListener("scroll", onReaderBarScroll);
+    window.removeEventListener("resize", onReaderBarResize);
+    readerTopbar?.classList.remove("gx-reader-nav-hidden");
+  };
+  window.GALAXITE_READER_CLEANUP = removeReaderTopbarScroll;
+
   const pageBox = document.querySelector(".pages");
   if (pageBox && window.GALAXITE_DB_CATALOG) {
     const chapterMeta = chaptersFor(w).find((item) => item.number === Number(ch));
@@ -237,6 +279,7 @@ function readerInit(w, ch) {
     window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.GALAXITE_READER_CLEANUP = () => {
+      removeReaderTopbarScroll();
       if (readerBreakpoint.removeEventListener) readerBreakpoint.removeEventListener("change", restoreReaderImages);
       else if (readerBreakpoint.removeListener) readerBreakpoint.removeListener(restoreReaderImages);
       window.removeEventListener("orientationchange", restoreReaderImages);
