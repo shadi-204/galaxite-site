@@ -18,6 +18,8 @@
 2. من GitHub افتح Settings ثم Pages.
 3. اختر Branch: `main` والمجلد `/` ثم Save.
 
+فرع التطوير ينتج أيضًا نسخة اختبار من خلال GitHub Actions: افتح [آخر workflow ناجح](https://github.com/shadi-204/galaxite-site/actions/runs/46088348561) ونزّل artifact باسم `galaxite-static-preview`. هذه نسخة ملفات ثابتة للمراجعة، وليست نشرًا جديدًا على رابط GitHub Pages. لا تُدمج تغييرات الفرع في `main` حتى اعتماد المراجعة.
+
 فرع التطوير الحالي: `backup/pre-galaxite-overhaul-2026-11-28`. التعديلات عليه لم تُدمج في `main` ولم تُنشر للزوار بعد.
 
 ## الملفات المهمة
