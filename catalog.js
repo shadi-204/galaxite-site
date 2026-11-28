@@ -37,12 +37,31 @@
   };
   const catalogUpdated = () => window.dispatchEvent(new Event("galaxite:catalog-updated"));
 
+  function normalizeGenres(value) {
+    let items = Array.isArray(value) ? value : [];
+    if (!Array.isArray(value) && typeof value === "string") {
+      const raw = value.trim();
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        items = Array.isArray(parsed) ? parsed : raw.split(/[،,|]/);
+      } catch {
+        items = raw.split(/[،,|]/);
+      }
+    }
+    return items.map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object") return item.name || item.title || item.label || "";
+      return "";
+    }).map((item) => String(item).replace(/\s+/g, " ").trim()).filter(Boolean);
+  }
+
   function normalizeWorks(rows) {
     return (Array.isArray(rows) ? rows : []).map((w) => ({
       id: w.id,
       title: w.title || "",
       type: w.type || "مانهوا",
-      genres: Array.isArray(w.genres) ? w.genres : [],
+      genres: normalizeGenres(w.genres),
       rating: Number(w.rating || 0),
       status: w.status || "مستمر",
       desc: w.description || w.desc || "",
