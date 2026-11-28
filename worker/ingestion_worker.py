@@ -192,7 +192,7 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
         # chapter one-by-one would create thousands of unnecessary API calls.
         latest_chapters = chapters[-initial_chapters:] if initial_chapters else []
         selected_for_download = (set(x["number"] for x in latest_chapters)
-                                 if initial_chapters and work_index < download_works else set())
+                                 if initial_chapters and work_index < link_works else set())
         for chapter in latest_chapters:
             number = chapter["number"]
             query = f"select=id&work_id=eq.{work_id}&chapter_number=eq.{number}&limit=1"
