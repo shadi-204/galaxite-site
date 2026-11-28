@@ -1,4 +1,4 @@
-name: Validate Galaxite frontend
+name: Validate and build Galaxite preview
 
 on:
   push:
@@ -10,14 +10,32 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  validate-and-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Validate JavaScript, HTML assets, and public configuration
+
+      - name: Validate JavaScript, HTML assets, service worker, and public configuration
         run: node scripts/validate-galaxite.mjs
+
+      - name: Build static preview
+        run: node scripts/build-galaxite-preview.mjs
+
+      - name: Package preview
+        run: |
+          cd dist
+          zip -qr "$GITHUB_WORKSPACE/galaxite-static-preview.zip" .
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: galaxite-static-preview
+          path: galaxite-static-preview.zip
+          if-no-files-found: error
+          retention-days: 14
