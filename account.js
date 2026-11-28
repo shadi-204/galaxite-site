@@ -57,7 +57,10 @@ async function getSdk() {
     const ok = ({ data, error }) => { if (error) throw error; return data; };
     // Supabase emits PASSWORD_RECOVERY after a valid recovery link is exchanged for a session.
     c.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") setTimeout(() => passwordRecoveryPage(), 0);
+      if (event === "PASSWORD_RECOVERY") {
+        window.GALAXITE_PASSWORD_RECOVERY = true;
+        setTimeout(() => passwordRecoveryPage(), 0);
+      }
     });
     sdk = {
       signUp: async (e, pw) => { const data = ok(await c.auth.signUp({ email: e, password: pw })); return { email: data.user?.email || e, needsConfirmation: !data.session }; },
@@ -534,6 +537,6 @@ function profilePage(WORKS, slugf) {
   };
 }
 
-window.VX = { toast, level, me, locked, premium, lockedScreen, loginPage, profilePage, storePage, track, refreshHead, reveal, tilt, confetti, claimDaily, logout, restore, I, coin, LOCK_COST };
+window.VX = { toast, level, me, locked, premium, lockedScreen, loginPage, passwordRecoveryPage, profilePage, storePage, track, refreshHead, reveal, tilt, confetti, claimDaily, logout, restore, I, coin, LOCK_COST };
 document.addEventListener("DOMContentLoaded", () => { refreshHead(); restore(); });
 })();
