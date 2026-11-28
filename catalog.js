@@ -270,37 +270,44 @@
         resolvedChapterId = chapter.id;
       }
 
-      let pages = [];
+      let urls = [];
       if (db.functions?.invoke) {
-        const result = await db.functions.invoke("resolve-asura-chapter-pages", {
-          body: { chapterId: resolvedChapterId }
-        });
-        if (!result.error && Array.isArray(result.data?.pages)) {
-          pages = result.data.pages;
-        } else if (result.error) {
-          console.warn("Asura chapter resolver unavailable; using saved page URLs.", result.error);
+        // This existing project endpoint checks publication/source permissions,
+        // reuses saved links, locks concurrent refreshes, and scrapes missing links.
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const result = await db.functions.invoke("refresh-chapter-images", {
+            body: { chapterId: resolvedChapterId }
+          });
+          if (!result.error && Array.isArray(result.data?.urls)) {
+            urls = result.data.urls.filter((url) => typeof url === "string" && url.startsWith("https://"));
+            break;
+          }
+          if (!result.error && result.data?.pending && attempt < 7) {
+            await new Promise((resolve) => setTimeout(resolve, 900));
+            continue;
+          }
+          if (result.error) console.warn("Asura chapter refresh unavailable; using saved page URLs.", result.error);
+          break;
         }
       }
 
-      if (!pages.length) {
+      if (!urls.length) {
         const { data, error } = await db.from("site_chapter_pages")
           .select("page_number,storage_path,image_url")
           .eq("chapter_id", String(resolvedChapterId))
           .order("page_number", { ascending: true });
-        if (!error && Array.isArray(data)) pages = data;
+        const pages = !error && Array.isArray(data) ? data : [];
+        const resolved = await Promise.all(pages.map(async (page) => {
+          if (page.image_url) return { page: page.page_number, url: page.image_url };
+          if (!page.storage_path) return null;
+          const { data: signed, error: signError } = await db.storage.from("galaxite-chapters")
+            .createSignedUrl(page.storage_path, 3600);
+          return signError ? null : { page: page.page_number, url: signed?.signedUrl || "" };
+        }));
+        urls = resolved.filter((item) => item?.url)
+          .sort((a, b) => a.page - b.page)
+          .map((item) => item.url);
       }
-
-      const resolved = await Promise.all(pages.map(async (page) => {
-        if (page.image_url) return { page: page.page_number, url: page.image_url };
-        if (!page.storage_path) return null;
-        const { data, error } = await db.storage.from("galaxite-chapters")
-          .createSignedUrl(page.storage_path, 3600);
-        return error ? null : { page: page.page_number, url: data?.signedUrl || "" };
-      }));
-
-      const urls = resolved.filter((item) => item?.url)
-        .sort((a, b) => a.page - b.page)
-        .map((item) => item.url);
       if (urls.length) savePageUrlCache(cacheKey, urls);
       return urls;
     } catch (error) {
