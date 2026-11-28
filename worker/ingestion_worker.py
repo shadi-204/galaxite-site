@@ -335,6 +335,10 @@ def schedule_discovery(supabase: Supabase) -> None:
         "select=id,adapter_key,enabled,authorization_status,poll_interval_minutes&enabled=eq.true&authorization_status=eq.authorized&adapter_key=in.(galaxite_json_feed,asura_scans)",
     )
     now = datetime.now(timezone.utc)
+    LOG.info("Enabled authorized ingestion sources: %s", [
+        {"key": source.get("adapter_key"), "id": source.get("id")}
+        for source in sources
+    ])
     for source in sources:
         interval = max(5, min(1440, int(source.get("poll_interval_minutes") or 60)))
         cutoff = (now - timedelta(minutes=interval)).isoformat()
