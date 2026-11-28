@@ -997,3 +997,23 @@ body.light::after { opacity: 1; }
     transition: none !important;
   }
 }
+
+
+/* Keep the statistics plus sign on the visual RIGHT of its number in RTL. */
+body.gx-home-page .stat3 b.stat-value {
+  display: flex;
+  flex-direction: row;
+  direction: ltr;
+  unicode-bidi: isolate;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+}
+body.gx-home-page .stat3 .stat-number,
+body.gx-home-page .stat3 .stat-plus {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+body.gx-home-page .stat3 .stat-plus {
+  display: inline-block;
+}

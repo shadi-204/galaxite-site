@@ -384,8 +384,15 @@ async function fillLatestChapterGrid(recentGrid) {
       const date = formatAsuraDate(row.source_published_at);
       const chapterLabel = "الفصل " + nm(number);
       const sourceTitle = row.display_title || row.title || "";
+      const normalizedSourceTitle = String(sourceTitle)
+        .normalize("NFKC")
+        .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+        .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+        .trim();
+      const isGenericChapterTitle = /^(?:chapter|chap\.?|ch\.?|الفصل)\s*#?\s*\d+(?:\.\d+)?$/i.test(normalizedSourceTitle);
+      const showSourceTitle = sourceTitle && sourceTitle !== chapterLabel && !isGenericChapterTitle;
       return `<a class="wr" href="#/r/${slug(w)}/${number}">
-        <span class="latest-chapter-label"><b>${esc(chapterLabel)}</b>${sourceTitle && sourceTitle !== chapterLabel ? `<small>${esc(sourceTitle)}</small>` : ""}</span>
+        <span class="latest-chapter-label"><b>${esc(chapterLabel)}</b>${showSourceTitle ? `<small dir="auto">${esc(sourceTitle)}</small>` : ""}</span>
         <small>${esc(date)}</small>
       </a>`;
     }).join("");
