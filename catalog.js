@@ -1,7 +1,7 @@
 /* Fast Galaxite catalog: cached work cards first, chapter metadata on demand. */
 (() => {
   const WORKS_CACHE_KEY = "galaxite:catalog:works:v3";
-  const CHAPTER_CACHE_KEY = "galaxite:catalog:chapters:v4";
+  const CHAPTER_CACHE_KEY = "galaxite:catalog:chapters:v5";
   const PAGE_URL_CACHE_KEY = "galaxite:reader:page-urls:v1";
   const PAGE_URL_CACHE_TTL = 45 * 60 * 1000;
   const WORKS_CACHE_TTL = 6 * 60 * 60 * 1000;
