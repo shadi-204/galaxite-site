@@ -15,7 +15,7 @@ const byTitle = (t) => WORKS.find((w) => w.title === t);
 const slug = (w) => encodeURIComponent(w.title);
 const chapterDisplayTitle = (chapter, number) => {
   const raw = String(chapter.display_title || chapter.title || ("الفصل " + number));
-  const clean = raw.replace(/\\s+(?:just now|yesterday|last week|last month|last year|(?:\\d+|a|an|one)\\s+(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\\s+ago|[A-Za-z]{3,9}\\s+\\d{1,2},\\s+\\d{4})$/i, "").trim();
+  const clean = raw.replace(/\s+(?:just now|yesterday|last week|last month|last year|(?:\d+|a|an|one)\s+(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\s+ago|[A-Za-z]{3,9}\s+\d{1,2},\s+\d{4})$/i, "").trim();
   return clean || ("الفصل " + number);
 };
 const chaptersFor = (w) => {
