@@ -204,3 +204,32 @@ body.light .gx-login-actions .gx-login-signup{background:linear-gradient(90deg,v
   .rbar > span:last-of-type a { min-height: 30px; padding: 0 8px; font-size: 11px; }
   .chapter-heart-box { margin-top: 4px !important; }
 }
+
+
+/* Chapter publish date replaces the old generic "published chapter" label. */
+.chapter-meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px}
+.chapter-date{font-size:11px;font-weight:500;color:var(--mut,#a1a1aa);white-space:nowrap}
+body.light .chapter-date{color:#666}
+
+/* Keep reader pages visible and correctly sized after switching browser display modes. */
+@media(max-width:640px){
+  .pages{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-height:0!important;
+    overflow:visible!important;
+  }
+  .pages img{
+    display:block!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    max-width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    object-fit:contain;
+    background:transparent!important;
+  }
+}
