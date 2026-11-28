@@ -166,7 +166,12 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
     imported = 0
     for work_index, entry in enumerate(listings):
         detail_raw, _ = _request(entry["url"], {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
-        detail = parse_detail(detail_raw.decode("utf-8", "replace"), entry["url"])
+        observed_at = datetime.now(timezone.utc)
+        detail = parse_detail(
+            detail_raw.decode("utf-8", "replace"),
+            entry["url"],
+            observed_at=observed_at,
+        )
         title = (detail.get("title") or "").strip()
         if not title:
             title = re.sub(r"-7de80a82$", "", entry["slug"], flags=re.I).replace("-", " ").title()
@@ -196,16 +201,24 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
 
         # Upsert every chapter's public metadata in small batches. This keeps
         # the work page complete without fetching or storing chapter images.
-        chapter_rows = [
-            {
+        chapter_rows = []
+        for chapter in chapters:
+            row = {
                 "work_id": work_id,
                 "chapter_number": chapter["number"],
                 "title": (chapter.get("title") or "")[:300] or None,
                 "source_url": chapter.get("url"),
                 "is_published": True,
             }
-            for chapter in chapters
-        ]
+            # Keep the raw source title for compatibility, while storing a clean
+            # display label and Asura's own release date in separate columns.
+            display_title = (chapter.get("display_title") or "").strip()
+            source_published_at = chapter.get("source_published_at")
+            if display_title:
+                row["display_title"] = display_title[:300]
+            if source_published_at:
+                row["source_published_at"] = source_published_at
+            chapter_rows.append(row)
         for offset in range(0, len(chapter_rows), 100):
             supabase.request(
                 "POST",
