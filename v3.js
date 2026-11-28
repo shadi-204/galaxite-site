@@ -88,21 +88,22 @@ let st = "ch", sort = "new", sq = "", sMax = 40, sw = "";
 function series(w) {
   if (sw !== w.title) { sw = w.title; st = "ch"; sq = ""; sMax = 40; sort = "new"; }
   const u = me(), V = window.VX;
-  const base = Array.from({ length: w.chapters }, (_, i) => w.chapters - i);
+  const chapterRows = chaptersFor(w);
+  const base = chapterRows.map((chapter) => Number(chapter.number)).filter((number) => Number.isFinite(number) && number > 0);
   const firstP = base.find((c) => !V.premium(w, c));
   let chs = base.filter((c) => !sq || String(c).includes(sq.replace(/\D/g, "")) || ("الفصل " + c).includes(sq));
   if (sort === "old") chs = [...chs].reverse();
   const shown = chs.slice(0, sMax);
   const rev = S("vx-rev", {})[w.title] || [];
-  const allR = [...rev], avg = (allR.length ? allR.reduce((a, r) => a + r.s, 0) / allR.length : Number(w.rating || 0)).toFixed(1);
+  const allR = [...rev], avg = allR.length ? (allR.reduce((a, r) => a + r.s, 0) / allR.length).toFixed(1) : "—";
   const reacts = S("vx-react", {})[w.title] || {};
   const RE = [["أعجبني", 0], ["رائع", 0], ["مضحك", 0], ["صادم", 0], ["حزين", 0], ["غاضب", 0]];
   const sim = WORKS.filter((x) => x !== w).map((x) => ({ x, n: x.genres.filter((g) => w.genres.includes(g)).length })).sort((a, b) => b.n - a.n || b.x.rating - a.x.rating).slice(0, 6).map((o) => o.x);
-  const tabs = [["ch", `الفصول (${nm(w.chapters)})`], ["syn", "الملخص"], ["rev", `المراجعات (${nm(allR.length)})`], ["disc", "النقاشات"], ["media", "الميديا"]];
+  const tabs = [["ch", `الفصول (${nm(base.length)})`], ["syn", "الملخص"], ["rev", `المراجعات (${nm(allR.length)})`], ["disc", "النقاشات"], ["media", "الميديا"]];
   let body = "";
   if (st === "ch") body = `<div class="ctl"><input id="sq" type="search" placeholder="ابحث برقم الفصل..." value="${esc(sq)}" aria-label="بحث في الفصول"><button id="so" class="btn">${sort === "new" ? "الأحدث" : "الأقدم"}</button><button id="ma" class="btn">تحديد الكل كمقروء</button></div>
-    <div class="chl">${shown.map((c) => { const pr = V.premium(w, c), lk = V.locked(w, c), cur = (prog[w.title] || 0) === c; return `<a class="chr ${lk ? "lk" : ""} ${(prog[w.title] || 0) >= c ? "rd" : ""}" href="#/r/${slug(w)}/${c}"><span class="thm" style="background:${grad(w.title + c, c)}">${lk ? IC.lock : ""}</span><span class="cn"><b>الفصل ${nm(c)}</b><small>${c === w.chapters ? '<em class="new">' + IC.fire + " جديد</em>" : ago[c % ago.length]}${c === firstP && w.status === "مستمر" && w.chapters > 10 ? ' <em class="free">' + IC.unlock + " مجاني الآن</em>" : ""}${cur ? " · وصلت هنا" : ""}</small></span>${lk ? `<span class="price">${V.coin}<b>${V.LOCK_COST}</b></span>` : pr ? '<span class="price ok">مفتوح</span>' : `<span class="lk2">${IC.heart}<b>${nm((c * 7 + hue(w.title)) % 14)}</b></span>`}</a>`; }).join("")}</div>${chs.length > sMax ? `<button class="cta alt" id="mo" style="margin-top:12px">عرض المزيد (${nm(chs.length - sMax)})</button>` : ""}`;
-  if (st === "syn") body = `<div class="syn"><h4>الملخص</h4><p dir="auto">${esc(w.desc)}</p><h4>التصنيفات</h4><p>${w.genres.map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p>
+    <div class="chl">${shown.map((c) => { const pr = V.premium(w, c), lk = V.locked(w, c), cur = (prog[w.title] || 0) === c; return `<a class="chr ${lk ? "lk" : ""} ${(prog[w.title] || 0) >= c ? "rd" : ""}" href="#/r/${slug(w)}/${c}"><span class="thm" style="background:${grad(w.title + c, c)}">${lk ? IC.lock : ""}</span><span class="cn"><b>${esc(chapterRows.find((row) => Number(row.number) === c)?.title || ("الفصل " + nm(c)))}</b><small>${c === base[0] ? '<em class="new">' + IC.fire + " جديد</em>" : ago[c % ago.length]}${c === firstP && w.status === "مستمر" && base.length > 10 ? ' <em class="free">' + IC.unlock + " مجاني الآن</em>" : ""}${cur ? " · وصلت هنا" : ""}</small></span>${lk ? `<span class="price">${V.coin}<b>${V.LOCK_COST}</b></span>` : pr ? '<span class="price ok">مفتوح</span>' : `<span class="price ok">متاح</span>`}</a>`; }).join("")}</div>${chs.length > sMax ? `<button class="cta alt" id="mo" style="margin-top:12px">عرض المزيد (${nm(chs.length - sMax)})</button>` : ""}`;
+  if (st === "syn") body = `<div class="syn"><h4>الملخص</h4><p dir="auto">${esc(w.desc)}</p>
     <div class="share"><span>شارك العمل مع أصحابك</span><button class="cta" id="sh">${IC.share} مشاركة</button></div>
     <div class="reacts">${RE.map(([t, n]) => `<button data-r="${t}" class="${reacts[t] ? "on" : ""}"><b>${nm(n + (reacts[t] ? 1 : 0))}</b><span>${t}</span></button>`).join("")}</div></div>`;
   if (st === "rev") body = `<div class="rsum"><b>${avg}</b><span>${"★".repeat(Math.round(avg))}${"☆".repeat(5 - Math.round(avg))}</span><small>${nm(allR.length)} مراجعات</small></div>
@@ -111,11 +112,21 @@ function series(w) {
   if (st === "disc") { const pl = posts().filter((p) => p.series === w.title); body = `<div class="syn"><h4>النقاشات</h4><p>ناقش ${esc(w.title)} مع باقي القراء في المجتمع.</p>${pl.map((p) => `<div class="rv2">${av(p.u)}<div><b>${esc(p.u)}</b> <small>${rel(p.ts)}</small><p dir="auto">${esc(p.txt)}</p></div></div>`).join("") || '<p class="empty">مفيش نقاشات لسه. كن أول واحد يبدأ.</p>'}<a class="cta" href="#/community">ابدأ نقاش في المجتمع</a></div>`; }
   if (st === "media") body = `<div class="syn"><p class="empty">لسه مفيش لقطات. زر الكاميرا في القارئ هيسمح للقراء يحفظوا مشاهد ويشاركوها هنا (يحتاج قاعدة بيانات).</p></div>`;
   $("#app").innerHTML = `<div class="sp"><div class="spbg" style="background:${grad(w.title, 30)}"></div><a class="back" href="#/">← رجوع</a>
-  <div class="spgrid"><aside class="spside">${cover(w, "big")}<div class="spstats"><div><b>${avg}</b><small>التقييم</small></div><div><b>${nm(Math.round(w.rating * 40 + hue(w.title)))}</b><small>مفضلة</small></div></div>
+  <div class="spgrid"><aside class="spside">${cover(w, "big")}<div class="spstats"><div><b>${w.ratingCount ? Number(w.rating).toFixed(1) : "—"}</b><small>تقييم القرّاء</small></div><div><b>${nm(base.length)}</b><small>الفصول</small></div></div>
     <a class="cta wide" href="#/r/${slug(w)}/${prog[w.title] || 1}">${prog[w.title] ? "أكمل القراءة · فصل " + nm(prog[w.title]) : "ابدأ القراءة · فصل ١"}</a><button class="cta alt wide" id="mark">${marks.includes(w.title) ? "في المفضلة" : "أضف للمفضلة"}</button>
-    <ul class="spinfo"><li><span>الحالة</span><b>${esc(w.status)}</b></li><li><span>النوع</span><b>${kind(w)}</b></li><li><span>الفصول</span><b>${nm(w.chapters)}</b></li></ul></aside>
-  <div class="spmain"><h2 dir="auto">${esc(w.title)}</h2><div class="stabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" data-k="${k}" class="${st === k ? "on" : ""}">${t}</button>`).join("")}</div>${body}</div>
+    <ul class="spinfo"><li><span>الحالة</span><b>${esc(w.status)}</b></li><li><span>النوع</span><b>${kind(w)}</b></li><li><span>الفصول</span><b>${nm(base.length)}</b></li></ul></aside>
+  <div class="spmain"><h2 dir="auto">${esc(w.title)}</h2>
+<p class="spgenres">${(w.genres || []).map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p>
+<section class="engagement-panel" id="workRatingBox" data-work-id="${esc(w.id)}">
+  <div class="engagement-rating-head"><div><b>تقييم القرّاء</b><small id="workRatingCount">جارٍ تحميل التقييمات</small></div><strong id="workRatingAverage">— / 10</strong></div>
+  <label for="myWorkRating">قيّم العمل من 1 إلى 10</label>
+  <div class="rating-slider"><input id="myWorkRating" type="range" min="1" max="10" step="1" value="5"><output id="myWorkRatingValue">5 / 10</output></div>
+  <button class="cta" id="saveWorkRating" type="button">حفظ تقييمي</button>
+  <small id="workRatingNote">كل حساب يقدر يضيف تقييمًا واحدًا للعمل.</small>
+</section>
+<div class="stabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" data-k="${k}" class="${st === k ? "on" : ""}">${t}</button>`).join("")}</div>${body}</div>
   <aside class="spsim"><h4>أعمال مشابهة</h4>${sim.map((x) => `<a href="#/s/${slug(x)}"><span class="thm" style="background:${grad(x.title)}"></span><span dir="auto"><b>${esc(x.title)}</b><small>${IC.star} ${x.rating} · ${nm(x.chapters)} فصل</small></span></a>`).join("")}</aside></div></div>`;
+  window.GALAXITE_ENGAGEMENT?.bindWorkRating?.(w);
   const A = $("#app");
   A.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => { st = b.dataset.k; series(w); VX.reveal($("#app")); }));
   if ($("#sq")) $("#sq").oninput = (e) => { sq = e.target.value; const p = e.target.selectionStart; series(w); const n = $("#sq"); n.focus(); n.setSelectionRange(p, p); };
