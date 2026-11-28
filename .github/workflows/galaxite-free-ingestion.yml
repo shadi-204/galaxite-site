@@ -25,7 +25,7 @@ concurrency:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Check required secrets
         id: secret_check
@@ -60,7 +60,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RUN_ONCE: "true"
-          MAX_JOBS_PER_RUN: "5"
+          MAX_JOBS_PER_RUN: "30"
           ASURA_BROWSE_PAGES: "22"
           ASURA_INITIAL_CHAPTERS: "1"
           ASURA_INITIAL_WORKS_WITH_CHAPTERS: "20"
