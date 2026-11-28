@@ -203,4 +203,4 @@ home = function () {
 
 return { pages, community, top, series };
 })();
-series = V3.series;
+/* app.js owns the canonical work page; do not replace it after the first render. */
