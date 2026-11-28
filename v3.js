@@ -284,7 +284,14 @@ const pinnedChapterLoads = new Set();
 function wcard(w, i, pin) {
   const V = window.VX;
   const hasChapterMetadata = Array.isArray(w.publishedChapters);
-  const chapterRows = hasChapterMetadata ? [...w.publishedChapters] : []
+  const chapterRows = (
+    hasChapterMetadata
+      ? [...w.publishedChapters]
+      : Array.from({ length: Math.min(3, Math.max(0, Number(w.chapters) || 0)) }, (_, k) => ({
+          chapter_number: Number(w.chapters) - k,
+          title: ""
+        }))
+  )
     .map((chapter) => ({
       ...chapter,
       number: Number(chapter.chapter_number ?? chapter.number)
@@ -293,33 +300,34 @@ function wcard(w, i, pin) {
     .sort((a, b) => b.number - a.number)
     .slice(0, 3);
 
-  const rows = chapterRows.map((chapter, k) => {
-    const c = chapter.number;
-    const premium = hasChapterMetadata && V.premium(w, c);
-    const locked = premium && V.locked(w, c);
-    const date = formatAsuraDate(chapter.source_published_at);
-    const chapterTitle = "الفصل " + nm(c);
-    const status = locked
-      ? `<em class="new">${IC.lock} مقفول</em>`
-      : premium
-        ? '<em class="free">مفتوح</em>'
-        : date ? `<small>${esc(date)}</small>` : "";
-    return `<a class="wr ${locked ? "lk" : ""}" href="#/r/${slug(w)}/${c}">
+  const rows = chapterRows.map((chapter) => {
+    const number = chapter.number;
+    const premium = hasChapterMetadata && V.premium(w, number);
+    const locked = premium && V.locked(w, number);
+    const date = hasChapterMetadata ? formatAsuraDate(chapter.source_published_at) : "";
+    const chapterTitle = chapter.display_title || chapter.title || ("الفصل " + nm(number));
+    const status = !hasChapterMetadata
+      ? ""
+      : locked
+        ? `<em class="new">${IC.lock} مقفول</em>`
+        : premium
+          ? '<em class="free">مفتوح</em>'
+          : date ? `<small>${esc(date)}</small>` : "";
+    return `<a class="wr ${locked ? "lk" : ""}" href="#/r/${slug(w)}/${number}">
       <span>${locked ? IC.lock : ""}${esc(chapterTitle)}</span>
       ${status}
     </a>`;
   }).join("");
 
-  return `<div class="wc">
+  return `<div class="wc" data-work-id="${esc(w.id || "")}">
     <a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}${pin ? '<b class="pin">مثبت</b>' : ""}</a>
     <div class="wci">
       <a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
-      <div class="wm"><span>${IC.star} ${w.rating}</span><span class="st ${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</span></div>
-      ${hasChapterMetadata ? (rows || '<small class="work-source-date">لا توجد فصول منشورة مسجلة</small>') : ""}
+      <div class="wm"><span>${IC.star} <span class="work-rating">${Number(w.rating || 0).toFixed(1)}</span></span><span class="st ${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</span></div>
+      ${rows || (hasChapterMetadata ? '<small class="work-source-date">لا توجد فصول منشورة مسجلة</small>' : "")}
     </div>
   </div>`;
 }
-
 const _home = home;
 home = function () {
   _home();
