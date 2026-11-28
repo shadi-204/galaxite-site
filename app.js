@@ -10,6 +10,15 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const hue = (t) => { let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 const grad = (t, a = 0) => `linear-gradient(135deg,hsl(${(hue(t) + a) % 360},60%,38%),hsl(${(hue(t) + a + 60) % 360},60%,20%))`;
 const norm = (s) => String(s).toLowerCase().replace(/[\u064B-\u0652\u0640]/g, "").replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
+const normalizeGenreList = (values) => {
+  const labels = new Map();
+  for (const value of values) {
+    const label = String(value ?? "").replace(/\s+/g, " ").trim();
+    const key = norm(label);
+    if (key && !labels.has(key)) labels.set(key, label);
+  }
+  return [...labels.values()].sort((a, b) => a.localeCompare(b, "ar"));
+};
 const hit = (w, q) => !q || (!norm(q) ? [w.title, w.desc || ""].some((f) => String(f).toLowerCase().includes(q.toLowerCase())) : [w.title, ...(w.genres || []), w.desc || ""].some((f) => norm(f).includes(norm(q))));
 const byTitle = (t) => WORKS.find((w) => w.title === t);
 const slug = (w) => encodeURIComponent(w.title);
@@ -54,53 +63,68 @@ function initGenreTicker(root = document) {
   const { signal } = genreTickerController;
   let loopWidth = 0, offset = 0, lastFrame = 0;
   let pointer = null, dragging = false, hovered = false, focused = false;
-  let suppressClick = false;
+  let suppressClickUntil = 0;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const normalize = (value) => loopWidth > 0 ? ((value % loopWidth) + loopWidth) % loopWidth : 0;
+  const wrap = (value) => loopWidth > 0 ? ((value % loopWidth) + loopWidth) % loopWidth : 0;
   const paint = () => { track.style.transform = `translate3d(${-offset}px,0,0)`; };
+
   const measure = () => {
     const styles = getComputedStyle(track);
     const gap = parseFloat(styles.columnGap || styles.gap || "0") || 0;
-    loopWidth = firstSet.getBoundingClientRect().width + gap;
-    offset = normalize(offset);
+    const nextWidth = firstSet.getBoundingClientRect().width + gap;
+    if (!nextWidth) return;
+    const phase = loopWidth ? wrap(offset) / loopWidth : 0;
+    loopWidth = nextWidth;
+    offset = phase * loopWidth;
     paint();
   };
   measure();
 
   const onDown = (event) => {
-    if (event.button !== undefined && event.button !== 0) return;
-    pointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY, lastX: event.clientX, totalX: 0, totalY: 0 };
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    pointer = {
+      id: event.pointerId,
+      lastX: event.clientX,
+      totalX: 0,
+      totalY: 0,
+      lastY: event.clientY
+    };
     dragging = false;
   };
   const onMove = (event) => {
     if (!pointer || event.pointerId !== pointer.id) return;
     const dx = event.clientX - pointer.lastX;
-    pointer.totalX += dx;
-    pointer.totalY += event.clientY - (pointer.lastY ?? pointer.startY);
+    const dy = event.clientY - pointer.lastY;
     pointer.lastX = event.clientX;
     pointer.lastY = event.clientY;
+    pointer.totalX += dx;
+    pointer.totalY += dy;
+
     if (!dragging && Math.abs(pointer.totalX) > 6 && Math.abs(pointer.totalX) > Math.abs(pointer.totalY)) {
       dragging = true;
       viewport.classList.add("is-dragging");
+      try { viewport.setPointerCapture(event.pointerId); } catch {}
     }
     if (dragging) {
-      offset = normalize(offset - dx);
+      offset = wrap(offset - dx);
       paint();
+      if (event.cancelable) event.preventDefault();
     }
   };
   const onUp = (event) => {
     if (!pointer || event.pointerId !== pointer.id) return;
-    if (dragging) {
-      suppressClick = true;
-      setTimeout(() => { suppressClick = false; }, 300);
-    }
+    if (dragging) suppressClickUntil = Date.now() + 350;
+    try {
+      if (viewport.hasPointerCapture?.(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+    } catch {}
     pointer = null;
     dragging = false;
+    lastFrame = 0;
     viewport.classList.remove("is-dragging");
   };
 
   viewport.addEventListener("pointerdown", onDown, { signal });
-  window.addEventListener("pointermove", onMove, { passive: true, signal });
+  window.addEventListener("pointermove", onMove, { passive: false, signal });
   window.addEventListener("pointerup", onUp, { signal });
   window.addEventListener("pointercancel", onUp, { signal });
   viewport.addEventListener("pointerenter", () => { hovered = true; }, { signal });
@@ -108,17 +132,23 @@ function initGenreTicker(root = document) {
   viewport.addEventListener("focusin", () => { focused = true; }, { signal });
   viewport.addEventListener("focusout", (event) => { focused = viewport.contains(event.relatedTarget); }, { signal });
   viewport.addEventListener("click", (event) => {
-    if (!suppressClick) return;
+    if (Date.now() >= suppressClickUntil) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    suppressClick = false;
+    suppressClickUntil = 0;
   }, { capture: true, signal });
   viewport.addEventListener("keydown", (event) => {
     if (event.target !== viewport) return;
-    if (event.key === "ArrowLeft") { offset = normalize(offset + 100); paint(); }
-    if (event.key === "ArrowRight") { offset = normalize(offset - 100); paint(); }
+    if (event.key === "ArrowLeft") { offset = wrap(offset + 100); paint(); }
+    if (event.key === "ArrowRight") { offset = wrap(offset - 100); paint(); }
   }, { signal });
   window.addEventListener("resize", measure, { passive: true, signal });
+
+  const resizeObserver = typeof ResizeObserver !== "undefined"
+    ? new ResizeObserver(measure)
+    : null;
+  resizeObserver?.observe(firstSet);
+  signal.addEventListener("abort", () => resizeObserver?.disconnect(), { once: true });
 
   const animate = (now) => {
     if (!viewport.isConnected) {
@@ -130,14 +160,13 @@ function initGenreTicker(root = document) {
     const elapsed = Math.min((now - lastFrame) / 1000, 0.05);
     lastFrame = now;
     if (!reducedMotion && !dragging && !hovered && !focused && document.visibilityState === "visible") {
-      offset = normalize(offset + 25 * elapsed);
+      offset = wrap(offset + 25 * elapsed);
       paint();
     }
     genreTickerFrame = requestAnimationFrame(animate);
   };
   if (!reducedMotion) genreTickerFrame = requestAnimationFrame(animate);
 }
-
 function card(w, extra = "") {
   return `<a class="card" href="#/s/${slug(w)}">${cover(w)}<b class="flag">${kind(w)}</b>${extra}<span class="name" dir="auto">${esc(w.title)}</span></a>`;
 }
@@ -152,10 +181,11 @@ function home() {
   if (!q) h += `<section class="hero" id="hero"></section>`;
   if (!q && cont.length) h += `<h3 class="h">أكمل القراءة</h3><div class="row">${cont.map((t) => { const w = byTitle(t); return `<a class="card" href="#/r/${slug(w)}/${prog[t]}">${cover(w)}<b class="rate">ف ${prog[t]}</b><span class="name" dir="auto">${esc(t)}</span></a>`; }).join("")}</div>`;
   if (!q && favs.length) h += `<h3 class="h">المفضلة</h3><div class="row">${favs.map((t) => card(byTitle(t))).join("")}</div>`;
-  const genreList = [...new Set(WORKS.flatMap((w) => w.genres || []))].sort((a, b) => a.localeCompare(b));
+  const genreList = normalizeGenreList(WORKS.flatMap((w) => Array.isArray(w.genres) ? w.genres : typeof w.genres === "string" ? w.genres.split(/[،,|]/) : []));
   const genreChips = genreList.map((g) => `<button class="gchip" data-gg="${esc(g)}">${esc(g)}</button>`).join("");
   const duplicateGenreChips = genreList.map((g) => `<button class="gchip" data-gg="${esc(g)}" tabindex="-1">${esc(g)}</button>`).join("");
-  if (!q) h += `<div class="stat3"><div><b data-to="${WORKS.length}" data-suffix="+">0</b><span>عمل</span></div><div><b data-to="${WORKS.reduce((a, w) => a + (Array.isArray(w.publishedChapters) ? w.publishedChapters.length : w.chapters), 0)}" data-suffix="+">0</b><span>فصل</span></div><div><b data-to="${genreList.length}" data-suffix="+">0</b><span>تصنيف</span></div></div><h3 class="h">تصفح بالنوع</h3><div class="gstrip" role="region" aria-label="تصفح التصنيفات" tabindex="0"><div class="gstrip-track"><div class="gstrip-set">${genreChips}</div><div class="gstrip-set" aria-hidden="true">${duplicateGenreChips}</div></div></div>`;
+  const repeatGenreChips = genreList.map((g) => `<button class="gchip" data-gg="${esc(g)}" tabindex="-1">${esc(g)}</button>`).join("");
+  if (!q) h += `<div class="stat3"><div><b data-to="${WORKS.length}" data-suffix="+">0</b><span>عمل</span></div><div><b data-to="${WORKS.reduce((a, w) => a + (Array.isArray(w.publishedChapters) ? w.publishedChapters.length : w.chapters), 0)}" data-suffix="+">0</b><span>فصل</span></div><div><b data-to="${genreList.length}" data-suffix="+">0</b><span>تصنيف</span></div></div><h3 class="h">تصفح بالنوع</h3><div class="gstrip" role="region" aria-label="تصفح التصنيفات" tabindex="0"><div class="gstrip-track"><div class="gstrip-set">${genreChips}</div><div class="gstrip-set" aria-hidden="true">${duplicateGenreChips}</div><div class="gstrip-set" aria-hidden="true">${repeatGenreChips}</div></div></div>`;
   h += rowOf("الأعلى تقييمًا من القراء", [...list].sort((a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount));
   if (!q) h += rowOf("اختيارات المحرر", [...list].filter((w) => w.ratingCount > 0 && w.rating >= 8.5).sort((a, b) => b.rating - a.rating));
   if (!q) h += `<h3 class="h">أفضل 10</h3><ol class="top10">${[...WORKS].filter((w) => w.ratingCount > 0).sort((a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount).slice(0, 10).map((w, i) => `<li><a href="#/s/${slug(w)}"><b class="num">${i + 1}</b>${cover(w, "sm")}<span><i dir="auto">${esc(w.title)}</i><small>${kind(w)} · ⭐ ${Number(w.rating).toFixed(1)} (${w.ratingCount})</small></span></a></li>`).join("") || `<li class="empty">لسه مفيش تقييمات من القراء.</li>`}</ol>`;
