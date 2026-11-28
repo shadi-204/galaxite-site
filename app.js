@@ -50,9 +50,9 @@ function home() {
   if (!q && cont.length) h += `<h3 class="h">أكمل القراءة</h3><div class="row">${cont.map((t) => { const w = byTitle(t); return `<a class="card" href="#/r/${slug(w)}/${prog[t]}">${cover(w)}<b class="rate">ف ${prog[t]}</b><span class="name" dir="auto">${esc(t)}</span></a>`; }).join("")}</div>`;
   if (!q && favs.length) h += `<h3 class="h">المفضلة</h3><div class="row">${favs.map((t) => card(byTitle(t))).join("")}</div>`;
   if (!q) h += `<div class="stat3"><div><b data-to="${WORKS.length}">0</b><span>عمل</span></div><div><b data-to="${WORKS.reduce((a, w) => a + (Array.isArray(w.publishedChapters) ? w.publishedChapters.length : w.chapters), 0)}">0</b><span>فصل</span></div><div><b data-to="${new Set(WORKS.flatMap((w) => w.genres)).size}">0</b><span>تصنيف</span></div></div><h3 class="h">تصفح بالنوع</h3><div class="gstrip">${[...new Set(WORKS.flatMap((w) => w.genres))].map((g) => `<button class="gchip" data-gg="${esc(g)}">${esc(g)}</button>`).join("")}</div>`;
-  h += rowOf("الأكثر شعبية", [...list].sort((a, b) => b.rating - a.rating));
-  if (!q) h += rowOf("اختيارات المحرر", [...list].filter((w) => w.rating >= 8.5).sort((a, b) => a.title.localeCompare(b.title)));
-  if (!q) h += `<h3 class="h">أفضل 10</h3><ol class="top10">${[...WORKS].sort((a, b) => b.rating - a.rating).slice(0, 10).map((w, i) => `<li><a href="#/s/${slug(w)}"><b class="num">${i + 1}</b>${cover(w, "sm")}<span><i dir="auto">${esc(w.title)}</i><small>${kind(w)} · ⭐ ${w.rating}</small></span></a></li>`).join("")}</ol>`;
+  h += rowOf("الأعلى تقييمًا من القراء", [...list].sort((a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount));
+  if (!q) h += rowOf("اختيارات المحرر", [...list].filter((w) => w.ratingCount > 0 && w.rating >= 8.5).sort((a, b) => b.rating - a.rating));
+  if (!q) h += `<h3 class="h">أفضل 10</h3><ol class="top10">${[...WORKS].filter((w) => w.ratingCount > 0).sort((a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount).slice(0, 10).map((w, i) => `<li><a href="#/s/${slug(w)}"><b class="num">${i + 1}</b>${cover(w, "sm")}<span><i dir="auto">${esc(w.title)}</i><small>${kind(w)} · ⭐ ${Number(w.rating).toFixed(1)} (${w.ratingCount})</small></span></a></li>`).join("") || `<li class="empty">لسه مفيش تقييمات من القراء.</li>`}</ol>`;
   h += `<h3 class="h">آخر التحديثات</h3><div class="latest">${list.map((w, i) => { const chapters = chaptersFor(w).slice(0, 3); return `<div class="item"><a href="#/s/${slug(w)}">${cover(w, "sm")}</a><div><a class="t" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>${chapters.map((chapter, k) => `<a class="ch" href="#/r/${slug(w)}/${chapter.number}"><span>الفصل ${chapter.number}</span><small>${k === 0 && i % 2 === 0 ? '<em class="new">● جديد</em>' : ago[(i + k) % ago.length]}</small></a>`).join("")}</div></div>`; }).join("")}</div>`;
   if (!list.length) h += "<p>مفيش نتائج</p>";
   $("#app").innerHTML = h;
@@ -62,7 +62,7 @@ function home() {
     const draw = () => {
       const w = hero[slide];
       $("#hero").style.background = grad(w.title, 20);
-      $("#hero").innerHTML = `<div class="hero-art tilt" aria-hidden="true">${cover(w)}</div><div class="hero-in"><span class="badge">${kind(w)}</span><span class="badge alt">⭐ ${w.rating}</span><h2 dir="auto">${esc(w.title)}</h2><p>${esc(w.desc)}</p><a class="cta" href="#/s/${slug(w)}">ابدأ القراءة</a></div><div class="dots">${hero.map((_, i) => `<button data-i="${i}" aria-label="slide ${i + 1}" class="${i === slide ? "on" : ""}"></button>`).join("")}</div>`;
+      $("#hero").innerHTML = `<div class="hero-art tilt" aria-hidden="true">${cover(w)}</div><div class="hero-in"><span class="badge">${kind(w)}</span><span class="badge alt">⭐ ${w.ratingCount ? Number(w.rating).toFixed(1) : "—"}</span><h2 dir="auto">${esc(w.title)}</h2><p>${esc(w.desc)}</p><a class="cta" href="#/s/${slug(w)}">ابدأ القراءة</a></div><div class="dots">${hero.map((_, i) => `<button data-i="${i}" aria-label="slide ${i + 1}" class="${i === slide ? "on" : ""}"></button>`).join("")}</div>`;
       document.querySelectorAll(".dots button").forEach((b) => (b.onclick = () => { slide = +b.dataset.i; draw(); }));
     };
     draw();
@@ -170,7 +170,7 @@ let flt = { g: [], st: "", sort: "rating", min: 0, hideB: false, page: 1 }, PER 
 function library() {
   const q = $("#q").value.trim();
   const genres = [...new Set(WORKS.flatMap((w) => w.genres || []))];
-  const sorts = { rating: (a, b) => b.rating - a.rating, title: (a, b) => a.title.localeCompare(b.title), chapters: (a, b) => b.chapters - a.chapters };
+  const sorts = { rating: (a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount, title: (a, b) => a.title.localeCompare(b.title), chapters: (a, b) => b.chapters - a.chapters };
   const all = WORKS.filter((w) => (tab === "all" || w.type === tab) && hit(w, q) && flt.g.every((g) => (w.genres || []).includes(g)) && (!flt.st || w.status === flt.st) && w.chapters >= flt.min && !(flt.hideB && marks.includes(w.title))).sort(sorts[flt.sort]);
   const pages = Math.max(1, Math.ceil(all.length / PER)); flt.page = Math.min(flt.page, pages);
   const items = all.slice((flt.page - 1) * PER, flt.page * PER);
