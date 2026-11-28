@@ -94,7 +94,7 @@ new MutationObserver(() => { if (!$("#v4home")) enrich(); }).observe($("#app"), 
 
 /* ---- قائمة التنقل ---- */
 const nav = $("#mnav"); if (nav) nav.innerHTML = `<a href="#/" data-r="home">الرئيسية</a><a href="#/browse">تصفح</a><a href="#/latest">أحدث الفصول</a><a href="#/cats">التصنيفات</a><a href="#/rank">الأكثر قراءة</a><a href="#/store" data-r="store">المتجر</a><a href="#/community">المجتمع</a><a href="#/top">المتصدرين</a><a href="#/missions">المهام</a><a href="#/support">ادعمنا</a>`;
-const ft = document.querySelector(".foot nav"); if (ft) ft.insertAdjacentHTML("beforeend", `<a href="#/support">ادعمنا</a><a href="team.html">لوحة فريق الترجمة</a><a href="siteadmin.html">لوحة مدير الموقع</a>`);
+const ft = document.querySelector(".foot nav"); if (ft) ft.insertAdjacentHTML("beforeend", `<a href="#/support">ادعمنا</a>`);
 
 /* ---- كوكيز ونافذة الجديد ---- */
 if (!LS.g("v4ck", 0)) { const c = document.createElement("div"); c.className = "v4ck"; c.innerHTML = `<div><b>تجربة قراءة أفضل</b><small>نحفظ تقدمك وإعداداتك على جهازك فقط.</small></div><span><button class="cta" id="ck1">موافق</button><button class="cta alt" id="ck2">رفض</button></span>`; document.body.appendChild(c); c.querySelectorAll("button").forEach((b) => (b.onclick = () => { LS.s("v4ck", 1); c.remove(); })); }
