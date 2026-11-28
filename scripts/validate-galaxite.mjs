@@ -70,8 +70,12 @@ for (const file of htmlFiles) {
 }
 
 const requiredScripts = {
-  "index.html": ["auth-config.js", "account.js", "reports.js", "catalog.js", "app.js"],
-  "admin.html": ["auth-config.js", "reports.js", "admin.js"]
+  "index.html": ["auth-config.js", "supabase-client.js", "account.js", "reports.js", "catalog.js", "app.js"],
+  "admin.html": ["auth-config.js", "supabase-client.js", "reports.js", "admin.js"]
+};
+const requiredScriptOrder = {
+  "index.html": ["auth-config.js", "supabase-client.js", "account.js", "catalog.js", "app.js"],
+  "admin.html": ["auth-config.js", "supabase-client.js", "admin.js"]
 };
 for (const [htmlName, required] of Object.entries(requiredScripts)) {
   const file = resolve(ROOT, htmlName);
@@ -84,6 +88,12 @@ for (const [htmlName, required] of Object.entries(requiredScripts)) {
     if (!html.includes('src="' + script + '"') && !html.includes("src='" + script + "'")) {
       fail(htmlName + " does not include required script " + script);
     }
+  }
+  const scriptSources = [...html.matchAll(/<script\\b[^>]*src=["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
+  const order = requiredScriptOrder[htmlName] || [];
+  const positions = order.map((script) => scriptSources.indexOf(script));
+  if (positions.some((position) => position < 0) || positions.some((position, index) => index > 0 && position <= positions[index - 1])) {
+    fail(htmlName + " loads shared Supabase client or app entry scripts in the wrong order.");
   }
 }
 
