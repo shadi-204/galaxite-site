@@ -84,7 +84,20 @@ function realGate(p, msg) {
       }
       if (p === "supabase") await loadWorksFromDatabase();
       sessionStorage.setItem(KEY_SESSION, "1"); render();
-    } catch (error) { $("#ge").textContent = error?.message || "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات."; }
+    } catch (error) {
+      if (p === "supabase" && (error?.code === "email_not_confirmed" || /email not confirmed|confirm your email/i.test(error?.message || ""))) {
+        $("#ge").innerHTML = 'البريد الإلكتروني لم يتم تأكيده بعد. <button type="button" class="btn sm" id="resendOwnerConfirm">إعادة إرسال رسالة التأكيد</button>';
+        $("#resendOwnerConfirm").onclick = async () => {
+          const email = $("#em").value.trim();
+          if (!isOwner(email)) { $("#ge").textContent = "هذا الحساب غير مسموح له بالدخول."; return; }
+          const button = $("#resendOwnerConfirm"); button.disabled = true;
+          const { error: resendError } = await window.GALAXITE_SUPABASE_CLIENT.auth.resend({ type: "signup", email });
+          $("#ge").textContent = resendError ? (resendError.message || "تعذر إرسال رسالة التأكيد.") : "تم طلب إرسال رسالة التأكيد. افحص البريد الوارد والرسائل غير المرغوب فيها.";
+        };
+      } else {
+        $("#ge").textContent = error?.message || "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات.";
+      }
+    }
   };
 }
 
