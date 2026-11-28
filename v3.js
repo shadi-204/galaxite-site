@@ -328,6 +328,122 @@ function wcard(w, i, pin) {
     </div>
   </div>`;
 }
+
+async function fillLatestChapterGrid(recentGrid) {
+  const selectedType = tab;
+  let rows = [];
+  try {
+    rows = await window.GALAXITE_DB_CATALOG?.getLatestChapters?.(60) || [];
+  } catch (error) {
+    console.warn("Latest chapter metadata unavailable.", error);
+  }
+  if (!recentGrid.isConnected || lt !== "latest" || tab !== selectedType) return;
+
+  const grouped = new Map();
+  (rows || []).forEach((row) => {
+    const w = WORKS.find((item) => String(item.id) === String(row.work_id));
+    if (!w || (selectedType !== "all" && w.type !== selectedType)) return;
+    const key = String(w.id);
+    if (!grouped.has(key)) grouped.set(key, { w, rows: [] });
+    grouped.get(key).rows.push(row);
+  });
+
+  const groups = [...grouped.values()]
+    .map((group) => ({
+      ...group,
+      rows: [...group.rows].sort((a, b) =>
+        (Date.parse(b.source_published_at || "") || 0) - (Date.parse(a.source_published_at || "") || 0)
+        || Number(b.chapter_number) - Number(a.chapter_number)
+      )
+    }))
+    .sort((a, b) =>
+      (Date.parse(b.rows[0]?.source_published_at || "") || 0) - (Date.parse(a.rows[0]?.source_published_at || "") || 0)
+    )
+    .slice(0, 18);
+
+  const cards = await Promise.all(groups.map(async ({ w, rows: recentRows }) => {
+    let chapters = [...recentRows];
+    if (chapters.length < 2 && w.id) {
+      try {
+        const more = await window.GALAXITE_DB_CATALOG?.getWorkLatestChapters?.(w.id, 2) || [];
+        const seen = new Set(chapters.map((row) => String(row.chapter_number)));
+        chapters.push(...more.filter((row) => !seen.has(String(row.chapter_number))));
+      } catch (error) {
+        console.warn("Second latest chapter unavailable for home card.", error);
+      }
+    }
+
+    chapters.sort((a, b) =>
+      (Date.parse(b.source_published_at || "") || 0) - (Date.parse(a.source_published_at || "") || 0)
+      || Number(b.chapter_number) - Number(a.chapter_number)
+    );
+    chapters = chapters.slice(0, 3);
+
+    const chapterRows = chapters.map((row) => {
+      const number = Number(row.chapter_number);
+      const date = formatAsuraDate(row.source_published_at);
+      const chapterLabel = "الفصل " + nm(number);
+      const sourceTitle = row.display_title || row.title || "";
+      return `<a class="wr" href="#/r/${slug(w)}/${number}">
+        <span class="latest-chapter-label"><b>${esc(chapterLabel)}</b>${sourceTitle && sourceTitle !== chapterLabel ? `<small>${esc(sourceTitle)}</small>` : ""}</span>
+        <small>${esc(date)}</small>
+      </a>`;
+    }).join("");
+
+    return `<div class="wc">
+      <a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}</a>
+      <div class="wci">
+        <a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
+        <div class="wm"><span>${IC.star} ${w.rating}</span><span class="st ${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</span></div>
+        ${chapterRows}
+      </div>
+    </div>`;
+  }));
+
+  if (!recentGrid.isConnected || lt !== "latest" || tab !== selectedType) return;
+  recentGrid.innerHTML = cards.length
+    ? cards.join("")
+    : '<p class="empty">لا توجد فصول منشورة حاليًا.</p>';
+  recentGrid.querySelectorAll(".wc").forEach((element) => element.classList.add("rv"));
+  VX.reveal(recentGrid);
+}
+
+function updateHomeListing() {
+  const q = $("#q").value.trim();
+  const section = document.querySelector("#app .lh");
+  const oldGrid = section?.nextElementSibling;
+  if (!section || !oldGrid) return;
+
+  const list = WORKS.filter((w) => (tab === "all" || w.type === tab) && hit(w, q.toLowerCase()));
+  const ordered = lt === "new"
+    ? [...list].sort((a, b) => {
+        const ad = Date.parse(a.source_updated_at || "") || 0;
+        const bd = Date.parse(b.source_updated_at || "") || 0;
+        return bd - ad || (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+      })
+    : list;
+  const showWorkCards = Boolean(q) || lt === "new";
+  const heading = section.querySelector(".h");
+  if (heading) heading.textContent = showWorkCards ? "الأعمال الأجدد" : "أحدث الفصول";
+  section.querySelectorAll(".ltabs button").forEach((button) => {
+    button.classList.toggle("on", button.dataset.l === lt);
+  });
+
+  const nextGrid = document.createElement("div");
+  nextGrid.className = showWorkCards ? "wgrid" : "wgrid latest-chapters";
+  if (showWorkCards) {
+    nextGrid.innerHTML = ordered.map((w, i) => wcard(w, i, 0)).join("")
+      || '<p class="empty">لا توجد أعمال مطابقة.</p>';
+    oldGrid.replaceWith(nextGrid);
+    nextGrid.querySelectorAll(".wc").forEach((element) => element.classList.add("rv"));
+    VX.reveal(nextGrid);
+  } else {
+    nextGrid.innerHTML = '<p class="empty">جارٍ تحميل أحدث الفصول...</p>';
+    oldGrid.replaceWith(nextGrid);
+    fillLatestChapterGrid(nextGrid);
+  }
+}
+
 const _home = home;
 home = function () {
   _home();
@@ -381,89 +497,22 @@ home = function () {
         })
         .finally(() => pinnedChapterLoads.delete(id));
     });
+    const pinnedGrid = document.querySelector("#app .wgrid.pins");
     Promise.all(pending).then(() => {
-      if (!location.hash || location.hash === "#" || location.hash === "#/") home();
+      if (!pinnedGrid?.isConnected) return;
+      pinnedGrid.innerHTML = pins.map((w, i) => wcard(w, i, 1)).join("");
+      pinnedGrid.querySelectorAll(".wc").forEach((element) => element.classList.add("rv"));
+      VX.reveal(pinnedGrid);
     });
   }
 
   const recentGrid = document.querySelector("#app .latest-chapters");
-  if (recentGrid && !q && lt === "latest") {
-    window.GALAXITE_DB_CATALOG?.getLatestChapters(60).then(async (rows) => {
-      if (!recentGrid.isConnected) return;
-
-      const grouped = new Map();
-      (rows || []).forEach((row) => {
-        const w = WORKS.find((item) => String(item.id) === String(row.work_id));
-        if (!w || (tab !== "all" && w.type !== tab)) return;
-        const key = String(w.id);
-        if (!grouped.has(key)) grouped.set(key, { w, rows: [] });
-        grouped.get(key).rows.push(row);
-      });
-
-      const groups = [...grouped.values()]
-        .map((group) => ({
-          ...group,
-          rows: [...group.rows].sort((a, b) =>
-            (Date.parse(b.source_published_at || "") || 0) - (Date.parse(a.source_published_at || "") || 0)
-            || Number(b.chapter_number) - Number(a.chapter_number)
-          )
-        }))
-        .sort((a, b) =>
-          (Date.parse(b.rows[0]?.source_published_at || "") || 0) - (Date.parse(a.rows[0]?.source_published_at || "") || 0)
-        )
-        .slice(0, 18);
-
-      const cards = await Promise.all(groups.map(async ({ w, rows: recentRows }) => {
-        let chapters = [...recentRows];
-        if (chapters.length < 2 && w.id) {
-          try {
-            const more = await window.GALAXITE_DB_CATALOG?.getWorkLatestChapters?.(w.id, 2) || [];
-            const seen = new Set(chapters.map((row) => String(row.chapter_number)));
-            chapters.push(...more.filter((row) => !seen.has(String(row.chapter_number))));
-          } catch (error) {
-            console.warn("Second latest chapter unavailable for home card.", error);
-          }
-        }
-
-        chapters.sort((a, b) =>
-          (Date.parse(b.source_published_at || "") || 0) - (Date.parse(a.source_published_at || "") || 0)
-          || Number(b.chapter_number) - Number(a.chapter_number)
-        );
-        chapters = chapters.slice(0, 3);
-
-        const chapterRows = chapters.map((row) => {
-          const number = Number(row.chapter_number);
-          const date = formatAsuraDate(row.source_published_at);
-          const chapterLabel = "الفصل " + nm(number);
-          const sourceTitle = row.display_title || row.title || "";
-          return `<a class="wr" href="#/r/${slug(w)}/${number}">
-            <span class="latest-chapter-label"><b>${esc(chapterLabel)}</b>${sourceTitle && sourceTitle !== chapterLabel ? `<small>${esc(sourceTitle)}</small>` : ""}</span>
-            <small>${esc(date)}</small>
-          </a>`;
-        }).join("");
-
-        return `<div class="wc">
-          <a href="#/s/${slug(w)}" class="wcv">${cover(w, "sm")}</a>
-          <div class="wci">
-            <a class="wt" dir="auto" href="#/s/${slug(w)}">${esc(w.title)}</a>
-            <div class="wm"><span>${IC.star} ${w.rating}</span><span class="st ${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</span></div>
-            ${chapterRows}
-          </div>
-        </div>`;
-      }));
-
-      if (!recentGrid.isConnected) return;
-      recentGrid.innerHTML = cards.length
-        ? cards.join("")
-        : '<p class="empty">لا توجد فصول منشورة حاليًا.</p>';
-      recentGrid.querySelectorAll(".wc").forEach((element) => element.classList.add("rv"));
-      VX.reveal(recentGrid);
-    });
-  }
+  if (recentGrid && !q && lt === "latest") fillLatestChapterGrid(recentGrid);
 
   document.querySelectorAll(".ltabs button").forEach((b) => (b.onclick = () => {
+    if (lt === b.dataset.l) return;
     lt = b.dataset.l;
-    home();
+    updateHomeListing();
   }));
   document.querySelectorAll("#app .wc, #app .lh").forEach((e) => e.classList.add("rv"));
   VX.reveal($("#app"));
