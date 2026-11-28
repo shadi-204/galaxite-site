@@ -61,6 +61,7 @@ async function getSdk() {
       google: async () => { ok(await c.auth.signInWithOAuth({ provider: "google" })); return null; },
       reset: async (e) => ok(await c.auth.resetPasswordForEmail(e)),
       resend: async (e) => ok(await c.auth.resend({ type: "signup", email: e })),
+      currentUser: async () => ok(await c.auth.getUser()).user,
       signOut: () => c.auth.signOut(),
       current: async () => (await c.auth.getSession()).data.session?.user?.email || null
     };
@@ -70,10 +71,21 @@ async function getSdk() {
 
 /* ---------- حالة المستخدم ---------- */
 let session = ls.get("vx-session", null);       // البريد أو null
+let authUserId = null;
 const keyOf = (e) => "vx-u:" + String(e).toLowerCase();
 const blank = (email, name) => ({ email, name: name || String(email).split("@")[0], bio: "", avatar: AVATARS[0], coins: 20, vipUntil: 0, unlocked: [], tx: [{ t: Date.now(), d: "هدية الترحيب", c: 20 }], xp: 0, read: [], daily: { last: "", streak: 0 }, joined: Date.now() });
 const me = () => session ? { ...blank(session), ...ls.get(keyOf(session), {}) } : null;
-const put = (u) => { ls.set(keyOf(u.email), u); refreshHead(); };
+const put = (u) => {
+  ls.set(keyOf(u.email), u);
+  refreshHead();
+  if (authUserId && realProvider() === "supabase") {
+    window.GALAXITE_GET_SUPABASE_CLIENT?.().then((db) => db?.from("profiles")
+      .update({ display_name: u.name || String(u.email).split("@")[0], bio: u.bio || "", xp: Number(u.xp) || 0 })
+      .eq("id", authUserId))
+      .then(({ error }) => { if (error) console.warn("Galaxite profile sync failed.", error); })
+      .catch((error) => console.warn("Galaxite profile sync failed.", error));
+  }
+};
 const isVip = (u) => u && u.vipUntil > Date.now();
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -254,19 +266,81 @@ function loginPage(next) {
   $("#gg").onclick = async () => { if (!real) return; try { const e = await (await getSdk()).google(); if (e) await finish(e, "", next); } catch { err("تعذر الدخول بـ Google."); } };
 }
 async function finish(email, name, next) {
-  mode = "in"; session = email; ls.set("vx-session", email);
-  const k = keyOf(email); const ex = ls.get(k, null);
-  put(ex ? { ...blank(email), ...ex } : blank(email, name));
-  toast("أهلاً " + (me().name), "ok"); confetti(30);
+  mode = "in";
+  if (realProvider() === "supabase") {
+    try {
+      const db = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+      const { data: { user }, error } = await db.auth.getUser();
+      if (error) throw error;
+      authUserId = user?.id || null;
+    } catch (error) {
+      console.warn("Galaxite could not read the authenticated user profile.", error);
+    }
+  }
+  session = email;
+  ls.set("vx-session", email);
+  const k = keyOf(email);
+  const ex = ls.get(k, null);
+  const profile = ex ? { ...blank(email), ...ex } : blank(email, name);
+  put(profile);
+  if (authUserId && realProvider() === "supabase") {
+    try {
+      const db = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+      const { error } = await db.from("profiles").upsert({
+        id: authUserId,
+        display_name: profile.name || String(email).split("@")[0],
+        bio: profile.bio || "",
+        xp: Number(profile.xp) || 0
+      }, { onConflict: "id" });
+      if (error) console.warn("Galaxite profile create/update failed.", error);
+    } catch (error) {
+      console.warn("Galaxite profile create/update failed.", error);
+    }
+  }
+  toast("أهلاً " + (me().name), "ok");
+  confetti(30);
   location.hash = next || "#/profile";
 }
 async function logout() {
   try { if (realProvider()) await (await getSdk()).signOut(); } catch {}
-  session = null; ls.set("vx-session", null); refreshHead(); toast("تم تسجيل الخروج"); location.hash = "#/";
+  session = null; authUserId = null; ls.set("vx-session", null); refreshHead(); toast("تم تسجيل الخروج"); location.hash = "#/";
 }
 async function restore() {
   if (!realProvider()) return;
-  try { const e = await (await getSdk()).current(); if (e) { session = e; ls.set("vx-session", e); if (!ls.get(keyOf(e), null)) put(blank(e)); } else if (session) { session = null; ls.set("vx-session", null); } refreshHead(); } catch {}
+  try {
+    const s = await getSdk();
+    const email = await s.current();
+    if (!email) {
+      authUserId = null;
+      if (session) { session = null; ls.set("vx-session", null); }
+      refreshHead();
+      return;
+    }
+    session = email;
+    ls.set("vx-session", email);
+    let profile = { ...blank(email), ...(ls.get(keyOf(email), {}) || {}) };
+    if (realProvider() === "supabase") {
+      const db = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+      const user = await s.currentUser?.();
+      authUserId = user?.id || null;
+      if (authUserId) {
+        const { data, error } = await db.from("profiles")
+          .select("display_name,bio,xp").eq("id", authUserId).maybeSingle();
+        if (error) console.warn("Galaxite profile load failed.", error);
+        if (data) profile = { ...profile, name: data.display_name || profile.name, bio: data.bio || "", xp: Number(data.xp) || 0 };
+        else {
+          const { error: insertError } = await db.from("profiles").upsert({
+            id: authUserId, display_name: profile.name, bio: profile.bio || "", xp: Number(profile.xp) || 0
+          }, { onConflict: "id" });
+          if (insertError) console.warn("Galaxite profile bootstrap failed.", insertError);
+        }
+      }
+    }
+    put(profile);
+    refreshHead();
+  } catch (error) {
+    console.warn("Galaxite session restore failed.", error);
+  }
 }
 
 /* ---------- المكافآت والتتبع ---------- */
