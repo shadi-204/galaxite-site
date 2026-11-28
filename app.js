@@ -95,14 +95,11 @@ function series(w) {
   if ($("#reportWork")) $("#reportWork").onclick = () => window.GalaxiteReports?.open({ targetType: "work", targetId: slug(w), targetTitle: w.title, targetPath: `#/s/${slug(w)}` });
 }
 function reader(w, ch) {
-  const chapters = chaptersFor(w);
+  let chapters = chaptersFor(w);
+  // Direct reader links can render before the complete chapter list arrives.
+  if (!chapters.length) chapters = [{ number: Number(ch), title: `الفصل ${Number(ch)}` }];
   const numbers = chapters.map((chapter) => chapter.number);
-  if (numbers.length) {
-    if (!numbers.includes(Number(ch))) ch = numbers[0];
-  } else {
-    $("#app").innerHTML = `<a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><p class="empty">لسه مفيش فصول منشورة للعمل ده.</p>`;
-    return;
-  }
+  if (numbers.length && !numbers.includes(Number(ch))) ch = numbers[0];
   ch = Number(ch);
   if (VX.locked(w, ch)) return VX.lockedScreen(w, ch, slug(w));
   VX.track(w, ch);
@@ -214,8 +211,23 @@ function ensureWorkChapters(w, mode, routeHash) {
     return true;
   }
   if (Array.isArray(w.publishedChapters) || w._chapterLoadFailed) return true;
-  workRouteSkeleton(w, mode);
   const key = String(w.id || w.title) + ":" + routeHash;
+  // A reader should not wait for the entire work's chapter catalogue.
+  // Render the requested chapter immediately while its navigation list loads.
+  if (mode === "r") {
+    if (!pendingWorkLoads.has(key)) {
+      pendingWorkLoads.add(key);
+      api?.getWorkChapters?.(w.id).then((rows) => {
+        w.publishedChapters = Array.isArray(rows) ? rows : [];
+        if (location.hash === routeHash) route();
+      }).catch((error) => {
+        console.warn("Work chapter list unavailable.", error);
+        w._chapterLoadFailed = true;
+      }).finally(() => pendingWorkLoads.delete(key));
+    }
+    return true;
+  }
+  workRouteSkeleton(w, mode);
   if (!pendingWorkLoads.has(key)) {
     pendingWorkLoads.add(key);
     api?.getWorkChapters?.(w.id).then((rows) => {
