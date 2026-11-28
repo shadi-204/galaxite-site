@@ -54,9 +54,8 @@ async function initSdk(p) {
     sdk = { signIn: async (e, pw) => { const c = await firebase.auth().signInWithEmailAndPassword(e, pw); return c.user.email; }, signOut: () => firebase.auth().signOut(),
       current: () => new Promise((r) => { const u = firebase.auth().onAuthStateChanged((x) => { u(); r(x ? x.email : null); }); }) };
   } else {
-    await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2");
-    const c = supabase.createClient(CFG.supabase.url, CFG.supabase.anonKey);
-    window.GALAXITE_SUPABASE_CLIENT = c;
+    const c = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+    if (!c) throw new Error("supabase_unavailable");
     sdk = { signIn: async (e, pw) => { const { data, error } = await c.auth.signInWithPassword({ email: e, password: pw }); if (error) throw error; return data.user.email; }, signOut: () => c.auth.signOut(),
       current: async () => { const { data } = await c.auth.getSession(); return data.session ? data.session.user.email : null; } };
   }
@@ -89,10 +88,17 @@ function realGate(p, msg) {
       if (p === "supabase") await loadWorksFromDatabase();
       sessionStorage.setItem(KEY_SESSION, "1"); render();
     } catch (error) {
-      if (p === "supabase" && (error?.code === "email_not_confirmed" || /email not confirmed|confirm your email/i.test(error?.message || ""))) {
-        $("#ge").textContent = "البريد المستخدم غير مؤكد في Supabase. استخدم حساب Owner مؤكدًا أو اربط حسابك ببريد يمكنك الوصول إليه.";
+      const message = String(error?.message || "").toLowerCase();
+      const code = String(error?.code || error?.error_code || "").toLowerCase();
+      console.warn("Galaxite admin sign-in failed:", code || "unknown", error);
+      if (code === "email_not_confirmed" || message.includes("email not confirmed") || message.includes("email_not_confirmed")) {
+        $("#ge").textContent = "البريد المستخدم غير مؤكد. افتح رسالة التأكيد أولًا، ثم أعد تسجيل الدخول بحساب Owner المؤكد.";
+      } else if (error?.message === "supabase_unavailable" || error?.message === "load" || message.includes("cdn") || message.includes("network") || message.includes("fetch") || message.includes("timed out")) {
+        $("#ge").textContent = "تعذر الاتصال بخدمة تسجيل الدخول. حدّث الصفحة وتأكد من اتصال الإنترنت ثم حاول مرة أخرى.";
+      } else if (code === "invalid_credentials" || message.includes("invalid login credentials")) {
+        $("#ge").textContent = "البريد أو كلمة المرور غير صحيحة. تأكد من استخدام حساب Owner الصحيح.";
       } else {
-        $("#ge").textContent = error?.message || "تعذر تسجيل الدخول. تأكد من البيانات والإعدادات.";
+        $("#ge").textContent = "تعذر تسجيل الدخول. راجع البيانات وحاول مرة أخرى.";
       }
     }
   };
