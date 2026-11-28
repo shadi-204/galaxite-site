@@ -434,9 +434,11 @@ home = function () {
         const chapterRows = chapters.map((row) => {
           const number = Number(row.chapter_number);
           const date = formatAsuraDate(row.source_published_at);
-          const title = row.display_title || row.title || ("الفصل " + nm(number));
+          const chapterLabel = "الفصل " + nm(number);
+          const sourceTitle = row.display_title || row.title || "";
           return `<a class="wr" href="#/r/${slug(w)}/${number}">
-            <span>${esc(title)}</span><small>${esc(date)}</small>
+            <span class="latest-chapter-label"><b>${esc(chapterLabel)}</b>${sourceTitle && sourceTitle !== chapterLabel ? `<small>${esc(sourceTitle)}</small>` : ""}</span>
+            <small>${esc(date)}</small>
           </a>`;
         }).join("");
 
