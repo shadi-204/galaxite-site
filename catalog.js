@@ -1,7 +1,9 @@
 /* Fast Galaxite catalog: cached work cards first, chapter metadata on demand. */
 (() => {
   const WORKS_CACHE_KEY = "galaxite:catalog:works:v3";
-  const CHAPTER_CACHE_KEY = "galaxite:catalog:chapters:v3";
+  const CHAPTER_CACHE_KEY = "galaxite:catalog:chapters:v4";
+  const PAGE_URL_CACHE_KEY = "galaxite:reader:page-urls:v1";
+  const PAGE_URL_CACHE_TTL = 45 * 60 * 1000;
   const WORKS_CACHE_TTL = 6 * 60 * 60 * 1000;
   const CHAPTER_CACHE_TTL = 15 * 60 * 1000;
   const MAX_CHAPTER_CACHE_WORKS = 18;
@@ -107,7 +109,7 @@
     const rows = [];
     while (true) {
       const result = await db.from("site_chapters")
-        .select("work_id,chapter_number,title,is_premium,created_at")
+        .select("id,work_id,chapter_number,title,is_premium,created_at")
         .eq("work_id", String(workId))
         .eq("is_published", true)
         .order("chapter_number", { ascending: false })
@@ -115,6 +117,7 @@
       if (result.error) throw result.error;
       const batch = Array.isArray(result.data) ? result.data : [];
       rows.push(...batch.map((chapter) => ({
+        id: chapter.id,
         chapter_number: Number(chapter.chapter_number),
         title: chapter.title || "",
         is_premium: Boolean(chapter.is_premium),
@@ -229,49 +232,81 @@
     }
   }
 
-  async function getChapterPages(workId, chapterNumber) {
-    const db = await getClient();
-    if (!db) throw new Error("Supabase client unavailable.");
+  function readPageUrlCache(key) {
+    const all = readJson(PAGE_URL_CACHE_KEY, {});
+    const entry = all && typeof all === "object" ? all[key] : null;
+    if (!entry || !Array.isArray(entry.urls) || Date.now() - Number(entry.savedAt || 0) > PAGE_URL_CACHE_TTL) return null;
+    return entry.urls;
+  }
 
-    const { data: chapter, error: chapterError } = await db.from("site_chapters")
-      .select("id,is_published")
-      .eq("work_id", String(workId))
-      .eq("chapter_number", Number(chapterNumber))
-      .maybeSingle();
-    if (chapterError) throw chapterError;
-    if (!chapter?.is_published) throw new Error("Chapter is not published.");
+  function savePageUrlCache(key, urls) {
+    const all = readJson(PAGE_URL_CACHE_KEY, {});
+    const next = all && typeof all === "object" ? all : {};
+    next[key] = { savedAt: Date.now(), urls };
+    const keep = Object.entries(next)
+      .sort((a, b) => Number(b[1]?.savedAt || 0) - Number(a[1]?.savedAt || 0))
+      .slice(0, 12);
+    writeJson(PAGE_URL_CACHE_KEY, Object.fromEntries(keep));
+  }
 
-    const { data, error } = await db.functions.invoke("refresh-chapter-images", {
-      body: { chapterId: chapter.id }
-    });
-    if (error) throw error;
-    if (Array.isArray(data?.urls) && data.urls.length) return data.urls;
-
-    // Another visitor may already be refreshing this chapter. Briefly poll
-    // the public page metadata instead of showing a false "not updated" state.
-    if (data?.pending) {
-      for (let attempt = 0; attempt < 8; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        const { data: pages, error: pagesError } = await db.from("site_chapter_pages")
-          .select("page_number,image_url,storage_path")
-          .eq("chapter_id", chapter.id)
-          .order("page_number", { ascending: true });
-        if (pagesError) throw pagesError;
-        const resolved = await Promise.all((pages || []).map(async (page) => {
-          if (page.image_url) return { page: page.page_number, url: page.image_url };
-          if (!page.storage_path) return null;
-          const { data: signed, error: signedError } = await db.storage
-            .from("galaxite-chapters").createSignedUrl(page.storage_path, 3600);
-          return signedError ? null : { page: page.page_number, url: signed?.signedUrl || "" };
-        }));
-        const urls = resolved.filter((item) => item?.url)
-          .sort((a, b) => a.page - b.page).map((item) => item.url);
-        if (urls.length) return urls;
+  async function getChapterPages(workId, chapterNumber, chapterId = null, forceRefresh = false) {
+    try {
+      const cacheKey = String(chapterId || (String(workId) + ":" + String(chapterNumber)));
+      if (!forceRefresh) {
+        const cachedUrls = readPageUrlCache(cacheKey);
+        if (cachedUrls?.length) return cachedUrls;
       }
-    }
 
-    if (data?.error) throw new Error(data.error);
-    return [];
+      const db = await getClient();
+      if (!db) return [];
+      let resolvedChapterId = chapterId;
+      if (!resolvedChapterId) {
+        const { data: chapter, error } = await db.from("site_chapters")
+          .select("id,is_published")
+          .eq("work_id", String(workId))
+          .eq("chapter_number", Number(chapterNumber))
+          .maybeSingle();
+        if (error || !chapter?.is_published) return [];
+        resolvedChapterId = chapter.id;
+      }
+
+      let pages = [];
+      if (db.functions?.invoke) {
+        const result = await db.functions.invoke("resolve-asura-chapter-pages", {
+          body: { chapterId: resolvedChapterId }
+        });
+        if (!result.error && Array.isArray(result.data?.pages)) {
+          pages = result.data.pages;
+        } else if (result.error) {
+          console.warn("Asura chapter resolver unavailable; using saved page URLs.", result.error);
+        }
+      }
+
+      if (!pages.length) {
+        const { data, error } = await db.from("site_chapter_pages")
+          .select("page_number,storage_path,image_url")
+          .eq("chapter_id", String(resolvedChapterId))
+          .order("page_number", { ascending: true });
+        if (!error && Array.isArray(data)) pages = data;
+      }
+
+      const resolved = await Promise.all(pages.map(async (page) => {
+        if (page.image_url) return { page: page.page_number, url: page.image_url };
+        if (!page.storage_path) return null;
+        const { data, error } = await db.storage.from("galaxite-chapters")
+          .createSignedUrl(page.storage_path, 3600);
+        return error ? null : { page: page.page_number, url: data?.signedUrl || "" };
+      }));
+
+      const urls = resolved.filter((item) => item?.url)
+        .sort((a, b) => a.page - b.page)
+        .map((item) => item.url);
+      if (urls.length) savePageUrlCache(cacheKey, urls);
+      return urls;
+    } catch (error) {
+      console.warn("Chapter pages unavailable.", error);
+      return [];
+    }
   }
 
   window.GALAXITE_DB_CATALOG = {
