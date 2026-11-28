@@ -204,11 +204,11 @@
   async function bindChapterListHearts(chapters) {
     const buttons = [...document.querySelectorAll(".chapter-heart[data-chapter-id]")];
     if (!buttons.length) return;
+
     const ids = [...new Set(buttons.map((button) => button.dataset.chapterId).filter(Boolean))];
     buttons.forEach((button) => { button.disabled = true; });
-    if (!ids.length) return;
 
-    buttons.forEach((button) => {
+    for (const button of buttons) {
       button.onclick = async (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -233,8 +233,9 @@
           button.disabled = false;
         }
       };
-    });
+    }
 
+    if (!ids.length) return;
     try {
       const db = await getDb();
       const { data, error } = await db.rpc("get_chapter_heart_stats_many", {
