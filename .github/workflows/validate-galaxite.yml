@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - backup/pre-galaxite-overhaul-2026-11-28
+      - galaxite-preview
   workflow_dispatch:
 
 permissions:
