@@ -72,12 +72,12 @@ def _parse(html: str) -> _PageParser:
 
 
 _ASURA_DATE_SUFFIX = re.compile(
-    r"(?P<date>[A-Za-z]{3,9}\\s+\\d{1,2},\\s+\\d{4})$",
+    r"(?P<date>[A-Za-z]{3,9}\s+\d{1,2},\s+\d{4})$",
     re.I,
 )
 _ASURA_RELATIVE_SUFFIX = re.compile(
     r"(?P<age>just now|yesterday|last week|last month|last year|"
-    r"(?:\\d+|a|an|one)\\s+(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\\s+ago)$",
+    r"(?:\d+|a|an|one)\s+(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\s+ago)$",
     re.I,
 )
 
@@ -94,7 +94,7 @@ def _chapter_display_metadata(
     explicit_datetime: str | None = None,
 ) -> tuple[str, str | None]:
     """Separate Asura's release-age/date suffix from the visible chapter title."""
-    text = re.sub(r"\\s+", " ", (raw_title or "").strip())
+    text = re.sub(r"\s+", " ", (raw_title or "").strip())
     observed = _as_utc(observed_at)
     published_at = None
     suffix = None
@@ -141,7 +141,7 @@ def _chapter_display_metadata(
                 delta = timedelta(days=365)
             else:
                 relative = re.fullmatch(
-                    r"(a|an|one|\\d+)\\s+(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\\s+ago",
+                    r"(a|an|one|\d+)\s+(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\s+ago",
                     age,
                     re.I,
                 )
@@ -169,7 +169,7 @@ def _chapter_display_metadata(
 
     display_title = text
     if suffix:
-        display_title = text[: -len(suffix)].rstrip(" -–—•|\\t")
+        display_title = text[: -len(suffix)].rstrip(" -–—•|\t")
     return display_title, published_at.isoformat() if published_at else None
 
 
