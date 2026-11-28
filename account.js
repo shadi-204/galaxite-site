@@ -58,7 +58,18 @@ async function getSdk() {
     sdk = {
       signUp: async (e, pw) => { const data = ok(await c.auth.signUp({ email: e, password: pw })); return { email: data.user?.email || e, needsConfirmation: !data.session }; },
       signIn: async (e, pw) => ok(await c.auth.signInWithPassword({ email: e, password: pw })).user.email,
-      google: async () => { ok(await c.auth.signInWithOAuth({ provider: "google" })); return null; },
+      google: async () => {
+        // GitHub Pages hosts this site under /galaxite-site/, not at the domain root.
+        // Send Supabase back to the current deployed site path after Google OAuth.
+        const redirectTo = new URL("./", window.location.href);
+        redirectTo.search = "";
+        redirectTo.hash = "";
+        ok(await c.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: redirectTo.toString() }
+        }));
+        return null;
+      },
       reset: async (e) => ok(await c.auth.resetPasswordForEmail(e)),
       resend: async (e) => ok(await c.auth.resend({ type: "signup", email: e })),
       currentUser: async () => ok(await c.auth.getUser()).user,
