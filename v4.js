@@ -47,8 +47,11 @@ async function latest() {
   if (!list.isConnected) return;
   const entries = rows.map((row) => ({ row, w: WORKS.find((work) => String(work.id) === String(row.work_id)) })).filter((x) => x.w && (lt === "all" || x.w.type === lt));
   list.innerHTML = entries.length ? entries.map(({row,w}) => {
-    const stamp = row.created_at ? new Date(row.created_at).toLocaleDateString("ar-EG") : "تاريخ غير متاح";
-    const chapterTitle = row.title || ("الفصل " + nm(row.chapter_number));
+    const sourceDate = row.source_published_at ? new Date(row.source_published_at) : null;
+    const stamp = sourceDate && !Number.isNaN(sourceDate.getTime())
+      ? new Intl.DateTimeFormat("ar-EG", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Cairo" }).format(sourceDate)
+      : "تاريخ Asura غير متاح";
+    const chapterTitle = row.display_title || row.title || ("الفصل " + nm(row.chapter_number));
     return `<a class="v4lc" href="#/r/${slug(w)}/${Number(row.chapter_number)}"><div class="v4th">${cover(w)}</div><div><b dir="auto">${esc(w.title)}</b><small>${esc(chapterTitle)}</small><small>${stamp}</small></div></a>`;
   }).join("") : '<p class="empty">لا توجد فصول منشورة متاحة في قاعدة البيانات.</p>';
 }
