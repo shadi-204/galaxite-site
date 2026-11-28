@@ -26,8 +26,49 @@
   }
 
   function showLogin(message) {
-    if (window.VX?.toast) window.VX.toast(message || "سجّل دخولك الأول عشان تشارك.");
-    location.hash = "#/login";
+    if (document.querySelector(".gx-login-overlay")) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "gx-login-overlay";
+    overlay.innerHTML = `
+      <section class="gx-login-modal" role="dialog" aria-modal="true" aria-labelledby="gxLoginTitle">
+        <button class="gx-login-close" type="button" aria-label="إغلاق">×</button>
+        <div class="gx-login-symbol" aria-hidden="true">♥</div>
+        <h3 id="gxLoginTitle">شاركنا تفاعلك على Galaxite</h3>
+        <p class="gx-login-message"></p>
+        <p class="gx-login-free">إنشاء حساب جديد مجاني تمامًا، ومش محتاج أي اشتراك.</p>
+        <div class="gx-login-actions">
+          <button class="gx-login-signup" type="button">إنشاء حساب مجاني</button>
+          <button class="gx-login-signin" type="button">تسجيل الدخول</button>
+        </div>
+      </section>`;
+    overlay.querySelector(".gx-login-message").textContent =
+      message || "لازم تسجل دخولك الأول عشان تضيف قلب أو تقيّم العمل.";
+    document.body.appendChild(overlay);
+
+    const close = () => {
+      document.removeEventListener("keydown", onKeyDown);
+      overlay.remove();
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") close();
+    };
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close();
+    });
+    overlay.querySelector(".gx-login-close").onclick = close;
+    overlay.querySelector(".gx-login-signin").onclick = () => {
+      close();
+      window.VX?.openAuth?.("in");
+      if (location.hash !== "#/login") location.hash = "#/login";
+    };
+    overlay.querySelector(".gx-login-signup").onclick = () => {
+      close();
+      window.VX?.openAuth?.("up");
+      if (location.hash !== "#/login") location.hash = "#/login";
+    };
+    document.addEventListener("keydown", onKeyDown);
+    overlay.querySelector(".gx-login-close").focus();
   }
 
   async function currentUser(db) {
@@ -54,7 +95,7 @@
     if (output) output.textContent = (slider?.value || "5") + " / 10";
     if (note) note.textContent = work.myRating != null
       ? "تقييمك الحالي محفوظ على حسابك، وتقدر تغيّره في أي وقت."
-      : "كل حساب يقدر يضيف تقييمًا واحدًا للعمل.";
+      : "شاركنا رأيك في العمل.";
   }
 
   async function loadWorkRating(work) {
@@ -150,6 +191,72 @@
     return data?.id || null;
   }
 
+  function updateChapterListHeart(button, stats) {
+    const liked = Boolean(stats?.is_liked);
+    const icon = button.querySelector(".chapter-heart-icon");
+    const count = button.querySelector(".chapter-heart-count");
+    button.setAttribute("aria-pressed", liked ? "true" : "false");
+    button.classList.toggle("liked", liked);
+    if (icon) icon.textContent = liked ? "♥" : "♡";
+    if (count) count.textContent = Number(stats?.hearts_count || 0).toLocaleString("ar-EG");
+  }
+
+  async function bindChapterListHearts(chapters) {
+    const buttons = [...document.querySelectorAll(".chapter-heart[data-chapter-id]")];
+    if (!buttons.length) return;
+    const ids = [...new Set(buttons.map((button) => button.dataset.chapterId).filter(Boolean))];
+    if (!ids.length) {
+      buttons.forEach((button) => { button.disabled = true; });
+      return;
+    }
+
+    buttons.forEach((button) => {
+      button.onclick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.disabled) return;
+        try {
+          const db = await getDb();
+          const user = await currentUser(db);
+          if (!user) {
+            showLogin("سجّل دخولك الأول عشان تضيف قلب للفصل. إنشاء الحساب مجاني.");
+            return;
+          }
+          button.disabled = true;
+          const { data, error } = await db.rpc("toggle_chapter_heart", {
+            p_chapter_id: button.dataset.chapterId
+          });
+          if (error) throw error;
+          updateChapterListHeart(button, rowOf(data));
+        } catch (error) {
+          console.error("Chapter list heart update failed.", error);
+          if (window.VX?.toast) window.VX.toast("تعذر تحديث القلب. حاول مرة أخرى.");
+        } finally {
+          button.disabled = false;
+        }
+      };
+    });
+
+    try {
+      const db = await getDb();
+      const { data, error } = await db.rpc("get_chapter_hearts_stats", {
+        p_chapter_ids: ids
+      });
+      if (error) throw error;
+      const byId = new Map((Array.isArray(data) ? data : [])
+        .map((row) => [String(row.chapter_id), row]));
+      buttons.forEach((button) => {
+        updateChapterListHeart(button, byId.get(String(button.dataset.chapterId)) || null);
+      });
+    } catch (error) {
+      console.warn("Chapter list heart stats unavailable.", error);
+      buttons.forEach((button) => {
+        const count = button.querySelector(".chapter-heart-count");
+        if (count) count.textContent = "—";
+      });
+    }
+  }
+
   function updateHeartBox(stats) {
     const button = $("#chapterHeartButton");
     const count = $("#chapterHeartCount");
@@ -214,6 +321,7 @@
   window.GALAXITE_ENGAGEMENT = {
     hydrateWorkRatings,
     bindWorkRating,
-    bindChapterHeart
+    bindChapterHeart,
+    bindChapterListHearts
   };
 })();
