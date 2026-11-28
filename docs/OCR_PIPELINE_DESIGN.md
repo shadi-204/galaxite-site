@@ -46,3 +46,13 @@
 - Text does not spill outside its approved region; any overflow is reported.
 - The original image can be restored for any failed or rejected inpainting result.
 - Only an approved result can move to the published chapter bucket.
+
+## Diagnostic OCR trial performed on the actual chapter
+
+A local Tesseract 5 pass was tested against the original images using the installed English and Korean language data (`eng+kor`, full-page OCR):
+
+- Page 040: the OCR found much of the lower English balloon, but confused **INGRID** with **INGRIO** and **AND** with **ANO**; it missed the separate stylized **DAMN!!** balloon entirely, even after testing multiple page-segmentation modes and a focused crop.
+- Page 020: the recognizer did not reliably transcribe the large stylized Korean sound effects; output was mostly isolated digits/fragments.
+- Conclusion: Tesseract is useful as a quick diagnostic baseline but is **not acceptable** for automatic translation or cleanup on this art style. Do not pass its raw output into the translation or publishing stages.
+
+The first candidate for a proper benchmark is PaddleOCR PP-OCRv5 with `lang="korean"`: the official model table lists the Korean recognition model as supporting both Korean and English. PP-OCRv5 also exposes text polygons and recognition results, which can be stored in the page coordinate system. This remains a candidate, not a benchmark result; it must still be run on the chapter before acceptance: https://www.paddleocr.ai/main/en/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.html
