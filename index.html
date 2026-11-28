@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="v2.css">
 <link rel="stylesheet" href="v3.css">
-<link rel="stylesheet" href="v4.css?v=28">
+<link rel="stylesheet" href="v4.css?v=29">
 </head>
 <body>
 <a class="skip" href="#app">تخطي إلى المحتوى</a>
@@ -45,20 +45,14 @@
 <script src="reports.js"></script>
 <script src="engagement.js?v=32"></script>
 <script src="catalog.js?v=4"></script>
-<script src="app.js?v=4"></script>
-<script src="v3.js?v=6"></script>
+<script src="app.js?v=5"></script>
+<script src="v3.js?v=7"></script>
 <script src="v4.js?v=2"></script>
 <script src="admin-embed.js"></script>
 <script>
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    const key = "galaxite-sw-controller-reload-v40";
-    if (sessionStorage.getItem(key) === "1") return;
-    sessionStorage.setItem(key, "1");
-    location.reload();
-  });
+  // Let the active worker take control without forcing a full page reload.
   navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
-    .then((registration) => registration.update())
     .catch(() => {});
 }
 </script>
