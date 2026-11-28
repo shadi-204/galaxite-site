@@ -1,0 +1,40 @@
+name: Asura single-chapter fetch pilot
+
+on:
+  push:
+    branches:
+      - galaxite-preview
+    paths:
+      - "worker/asura-fetch-pilot.trigger"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: galaxite-asura-fetch-pilot
+  cancel-in-progress: false
+
+jobs:
+  fetch_one:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout preview branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Process one queued chapter fetch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUN_ONCE: "true"
+          MAX_JOBS_PER_RUN: "1"
+          ASURA_BROWSE_PAGES: "1"
+          ASURA_INITIAL_CHAPTERS: "1"
+          ASURA_INITIAL_WORKS_WITH_CHAPTERS: "1"
+          LOG_LEVEL: "INFO"
+        run: python worker/ingestion_worker.py
