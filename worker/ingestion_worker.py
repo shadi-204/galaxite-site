@@ -182,8 +182,11 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
         }
         if existing:
             work_id = existing[0]["id"]
-            supabase.update("site_works", "id=eq." + work_id, fields)
+            # Refresh source metadata without ever changing an owner's publish decision.
+            update_fields = {key: value for key, value in fields.items() if key != "is_published"}
+            supabase.update("site_works", "id=eq." + work_id, update_fields)
         else:
+            # New imports always enter the private review queue.
             work_id = supabase.insert("site_works", fields)["id"]
         chapters = detail["chapters"]
         # Keep only the newest N chapter metadata rows per work. The full
