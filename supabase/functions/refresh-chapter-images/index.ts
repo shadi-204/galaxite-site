@@ -7,6 +7,8 @@ const cors = {
   "Content-Type": "application/json",
 };
 
+const PUBLISHABLE_KEY = "sb_publishable_0_SCF5uAaN3b9oQECQLHeQ_OZwbwfN7";
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: cors });
 
@@ -47,6 +49,7 @@ function extractImageUrls(html: string, pageUrl: string): string[] {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed." }, 405);
+  if (req.headers.get("apikey") !== PUBLISHABLE_KEY) return json({ error: "Invalid project key." }, 401);
 
   try {
     const { chapterId } = await req.json();
@@ -93,6 +96,18 @@ Deno.serve(async (req: Request) => {
       if (urls.length) return json({ urls, cached: true });
     }
 
+    const { data: sourceConfig, error: sourceConfigError } = await db
+      .from("site_content_sources")
+      .select("enabled,authorization_status,adapter_key")
+      .eq("source_key", "asura_scans")
+      .maybeSingle();
+    if (sourceConfigError) throw sourceConfigError;
+    if (
+      !sourceConfig?.enabled ||
+      sourceConfig.authorization_status !== "authorized" ||
+      sourceConfig.adapter_key !== "asura_scans"
+    ) return json({ error: "The Asura source is not enabled and authorized." }, 403);
+
     let source: URL;
     try { source = new URL(chapter.source_url); } catch { return json({ error: "Invalid chapter source URL." }, 400); }
     if (
@@ -131,7 +146,7 @@ Deno.serve(async (req: Request) => {
       page_number: index + 1,
       image_url,
     }));
-    const { error: insertError } = await db.from("site_chapter_pages").insert(rows);
+    const { error: insertError } = await db.from("site_chapter_pages").upsert(rows, { onConflict: "chapter_id,page_number" });
     if (insertError) throw insertError;
 
     return json({ urls, cached: false });
