@@ -117,25 +117,13 @@ body.light .gx-login-modal{background:#fff;color:#1a1b24}
 body.light .gx-login-close,body.light .gx-login-actions button{background:#f0eff7;color:#1a1b24}
 body.light .gx-login-actions .gx-login-signup{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff}
 
-@media(max-width:900px){
-  #app > .top{grid-template-columns:minmax(132px,160px) minmax(0,1fr);gap:14px}
-  #app > .top > .cover.big{max-width:160px}
-}
 @media(max-width:640px){
-  #app > .top{grid-template-columns:minmax(98px,116px) minmax(0,1fr);gap:11px;margin-top:10px}
-  #app > .top > .cover.big{max-width:116px;border-radius:14px}
-  #app > .top > div h2{font-size:clamp(18px,5.2vw,23px);line-height:1.35;margin-bottom:7px}
-  #app > .top > div p{font-size:12px;line-height:1.75;margin:6px 0}
-  #app > .top > div p .tag{font-size:11px;padding:3px 8px}
   .chapter-main{gap:9px}
   .chapter-end{gap:5px}
   .chapter-heart{min-width:52px;min-height:36px;padding:4px 8px}
   .gx-login-modal{padding:25px 17px 18px}
 }
 @media(max-width:420px){
-  #app > .top{grid-template-columns:minmax(88px,100px) minmax(0,1fr);gap:9px}
-  #app > .top > .cover.big{max-width:100px}
-  #app > .top > div h2{font-size:18px}
   .chapter-main{gap:8px}
   .chapter-end .price{font-size:11px;padding:5px 8px}
 }
