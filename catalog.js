@@ -219,7 +219,7 @@
     return refreshPromise;
   }
 
-  async function getLatestChapters(limit = 40) {
+  async function getLatestChapters(limit = 60) {
     try {
       const db = await getClient();
       if (!db) return [];
@@ -233,6 +233,26 @@
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.warn("Latest chapter metadata unavailable.", error);
+      return [];
+    }
+  }
+
+  async function getWorkLatestChapters(workId, limit = 2) {
+    try {
+      const db = await getClient();
+      if (!db) return [];
+      const safeLimit = Math.max(2, Math.min(3, Number(limit) || 2));
+      const { data, error } = await db.from("site_chapters")
+        .select("work_id,chapter_number,title,display_title,source_published_at")
+        .eq("work_id", String(workId))
+        .eq("is_published", true)
+        .not("source_published_at", "is", null)
+        .order("source_published_at", { ascending: false, nullsFirst: false })
+        .limit(safeLimit);
+      if (error) throw error;
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.warn("Work latest chapter metadata unavailable.", error);
       return [];
     }
   }
@@ -322,7 +342,7 @@
   }
 
   window.GALAXITE_DB_CATALOG = {
-    refresh, getLatestChapters, getChapterPages,
+    refresh, getLatestChapters, getWorkLatestChapters, getChapterPages,
     getCachedWorkChapters, getWorkChapters, refreshWorkChapters
   };
 
