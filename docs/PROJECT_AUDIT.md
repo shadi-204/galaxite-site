@@ -7,7 +7,7 @@
 - Supabase contains 16 works and 3,849 chapter metadata rows. `site_chapter_pages` currently contains zero rows, so there are no stored reader page images yet.
 - The private `galaxite-chapters` storage bucket and reader/admin storage policies exist.
 - Source discovery caches include Team-X and Azora. No complete Asura adapter exists for Galaxite.
-- Existing active Edge Functions include `refresh-teamx-catalog` and `solo-manga-download`. Both currently report `verify_jwt=false`; their code, caller authentication, and schedules must be reviewed before reuse or launch. They were not modified in this audit.
+- Existing active Edge Functions include `refresh-teamx-catalog` and `solo-manga-download`. Both currently report `verify_jwt=false`; they were not modified. `refresh-teamx-catalog` has an hourly `pg_cron` caller that sends no authentication header, and the function accepts public POST requests with only a 55-minute cache cooldown. It crawls the legacy Team-X and Azora sources and updates legacy catalog/discovery data, so it is not the Galaxite ingestion worker. Confirm the legacy integration is still wanted, then add a dedicated caller secret or other authentication before launch; do not disable it until its older app dependency is confirmed.
 - No OCR/image-cleanup/Arabic-typesetting worker is connected to the Galaxite publishing flow.
 
 ## Implemented in the working branch
