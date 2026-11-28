@@ -193,6 +193,13 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
             "sort_order": 0,
             "is_published": True,
         }
+        source_dates = [
+            chapter.get("source_published_at")
+            for chapter in chapters
+            if chapter.get("source_published_at")
+        ]
+        if source_dates:
+            fields["source_updated_at"] = max(source_dates)
         if existing:
             work_id = existing[0]["id"]
             supabase.update("site_works", "id=eq." + work_id, fields)
