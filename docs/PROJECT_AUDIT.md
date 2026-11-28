@@ -56,3 +56,18 @@
 
 - The GitHub workflow performs static checks only. It does not replace browser, auth, storage, RLS, payment, OCR, or load testing.
 - No changes from the working branch have been merged into `main` or published to the public site.
+
+## Follow-up QA and static preview build — 2026-11-28
+
+- Fixed the PWA service worker cache cleanup so it removes only older caches using the `galaxite-mobile-` prefix. It no longer clears unrelated Cache Storage entries on the shared `github.io` origin.
+- Reworked offline handling: the cached `index.html` is now a fallback only for navigation requests; missing static assets return a clear 503 response rather than an HTML document.
+- Reduced install-time precache to the public site's actual runtime assets and incremented the cache version to `galaxite-mobile-v14`.
+- Extended the validator to check every service-worker precache path, navigation fallback behavior, cache-prefix isolation, and successful-response-only caching.
+- Added `scripts/build-galaxite-preview.mjs`. Since the site is static HTML/CSS/JavaScript, this creates a clean `dist/` package without introducing an unnecessary bundler or runtime dependency.
+- Updated the branch workflow to validate, build, ZIP, and upload a `galaxite-static-preview` artifact (14-day retention).
+- Successful validation and build: workflow run [46088348561](https://github.com/shadi-204/galaxite-site/actions/runs/46088348561), commit `817213dec5f1b2f796ea15c92c4a75a06f63e07d`.
+- The preview artifact is available from that workflow run. It is a static package, not a new live GitHub Pages deployment.
+- The production `main` branch remains unchanged; no merge or public-site replacement was performed.
+- Browser end-to-end testing, real Owner login, storage uploads/signed URL checks, and RLS denial tests still require a browser session and are not certified by this build.
+- The purchased sample chapter has been stitched locally into 17 sequential parts from 88 original image files; it has not yet been uploaded to Supabase or published in the reader.
+- OCR, text detection, image cleaning/inpainting, Arabic translation/typesetting, and the worker runtime are still not implemented or deployed. The static build must not be mistaken for completion of the localization pipeline.
