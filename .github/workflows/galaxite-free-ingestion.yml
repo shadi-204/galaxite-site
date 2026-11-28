@@ -11,6 +11,8 @@ on:
       - galaxite-preview
     paths:
       - "worker/ingestion_worker.py"
+      - "worker/asura_adapter.py"
+      - "app.js"
       - ".github/workflows/galaxite-free-ingestion.yml"
 
 permissions:
