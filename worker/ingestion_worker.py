@@ -175,12 +175,17 @@ def _discover(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -
             else:
                 chapter_id = supabase.insert("site_chapters", chapter_fields)["id"]
             if chapter.get("pages"):
-                payload = {"page_urls": chapter["pages"], "source_host": urlparse(source["base_url"]).hostname}
-                supabase.insert("site_ingestion_jobs", {
-                    "source_id": source["id"], "job_type": "fetch_chapter",
-                    "external_work_id": str(work_id), "external_chapter_id": str(chapter_id),
-                    "payload": payload,
-                })
+                prior = supabase.rows(
+                    "site_ingestion_jobs",
+                    f"select=id&external_chapter_id=eq.{chapter_id}&job_type=eq.fetch_chapter&status=in.(queued,running,completed)&limit=1",
+                )
+                if not prior:
+                    payload = {"page_urls": chapter["pages"], "source_host": urlparse(source["base_url"]).hostname}
+                    supabase.insert("site_ingestion_jobs", {
+                        "source_id": source["id"], "job_type": "fetch_chapter",
+                        "external_work_id": str(work_id), "external_chapter_id": str(chapter_id),
+                        "payload": payload,
+                    })
     supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(), "last_error": None, "locked_at": None, "locked_by": None})
 
 
@@ -267,9 +272,11 @@ def process_one(supabase: Supabase, worker_id: str) -> bool:
             raise WorkerError(f"Job type {job['job_type']} is not implemented by this worker.")
     except Exception as exc:
         attempts = int(job.get("attempts") or 1)
-        status = "needs_attention" if attempts >= 3 else "failed"
+        status = "needs_attention" if attempts >= 3 else "queued"
+        retry_at = datetime.now(timezone.utc) + timedelta(minutes=min(60, 2 ** attempts))
         supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {
             "status": status, "last_error": str(exc)[:2000], "locked_at": None, "locked_by": None,
+            "run_after": retry_at.isoformat(),
         })
         LOG.exception("Job %s failed", job.get("id"))
     return True
