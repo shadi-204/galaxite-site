@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUTPUT = resolve(ROOT, "dist");
-const OMIT_DIRS = new Set([".git", ".github", "node_modules", "dist", "docs", "scripts", "supabase"]);
+const OMIT_DIRS = new Set([".git", ".github", "node_modules", "dist", "docs", "scripts", "supabase", "worker"]);
 const OMIT_FILES = new Set(["README.md"]);
 
 function copyPublicFiles(source, destination) {
@@ -53,6 +53,9 @@ function collect(dir) {
   }
 }
 collect(OUTPUT);
+if (copiedFiles.some((path) => path.startsWith("worker/"))) {
+  throw new Error("Private runtime/worker source must not be included in the public static preview.");
+}
 
 console.log("Galaxite static preview build completed.");
 console.log("Output: dist/");
