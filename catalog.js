@@ -63,6 +63,7 @@
     });
     latestRows = next;
     window.GALAXITE_SET_WORKS?.(next);
+    window.GALAXITE_ENGAGEMENT?.hydrateWorkRatings?.(next);
     return next;
   }
 
