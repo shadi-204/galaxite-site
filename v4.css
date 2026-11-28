@@ -120,12 +120,6 @@
   max-width:76ch;
   line-height:1.95;
 }
-#app > .top > div .cta{
-  margin:4px 6px 4px 0;
-  white-space:normal;
-  max-width:100%;
-  vertical-align:middle;
-}
 
 /* Chapter rows and live heart buttons */
 .chr{min-width:0}
@@ -188,7 +182,6 @@ body.light .gx-login-actions .gx-login-signup{background:linear-gradient(90deg,v
   #app > .top > div h2{font-size:clamp(18px,5.2vw,23px);line-height:1.35;margin-bottom:7px}
   #app > .top > div p{font-size:12px;line-height:1.75;margin:6px 0}
   #app > .top > div p .tag{font-size:11px;padding:3px 8px}
-  #app > .top > div .cta{min-height:37px;padding:0 11px;font-size:12px;margin:3px 4px 3px 0}
   .chapter-main{gap:9px}
   .chapter-end{gap:5px}
   .chapter-heart{min-width:52px;min-height:36px;padding:4px 8px}
