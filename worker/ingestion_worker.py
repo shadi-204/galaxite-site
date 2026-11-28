@@ -347,6 +347,8 @@ def schedule_discovery(supabase: Supabase) -> None:
             "source_id": f"eq.{source['id']}",
             "job_type": "eq.discover_works",
             "created_at": f"gte.{cutoff}",
+            # A cancelled/needs_attention job must not suppress future polling.
+            "status": "in.(queued,running,completed)",
             "limit": "1",
         })
         recent = supabase.rows("site_ingestion_jobs", query)
