@@ -55,6 +55,10 @@ async function getSdk() {
     const c = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
     if (!c) throw new Error("supabase_unavailable");
     const ok = ({ data, error }) => { if (error) throw error; return data; };
+    // Supabase emits PASSWORD_RECOVERY after a valid recovery link is exchanged for a session.
+    c.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setTimeout(() => passwordRecoveryPage(), 0);
+    });
     sdk = {
       signUp: async (e, pw) => { const data = ok(await c.auth.signUp({ email: e, password: pw })); return { email: data.user?.email || e, needsConfirmation: !data.session }; },
       signIn: async (e, pw) => ok(await c.auth.signInWithPassword({ email: e, password: pw })).user.email,
@@ -70,7 +74,13 @@ async function getSdk() {
         }));
         return null;
       },
-      reset: async (e) => ok(await c.auth.resetPasswordForEmail(e)),
+      reset: async (e) => {
+        const redirectTo = new URL("./", window.location.href);
+        redirectTo.search = "";
+        redirectTo.hash = "";
+        return ok(await c.auth.resetPasswordForEmail(e, { redirectTo: redirectTo.toString() }));
+      },
+      updatePassword: async (password) => ok(await c.auth.updateUser({ password })),
       resend: async (e) => ok(await c.auth.resend({ type: "signup", email: e })),
       currentUser: async () => ok(await c.auth.getUser()).user,
       signOut: () => c.auth.signOut(),
@@ -275,6 +285,58 @@ function loginPage(next) {
     try { await (await getSdk()).reset(email); toast("بعتنا رابط الاسترجاع لبريدك"); } catch { err("تعذر إرسال الرابط."); }
   };
   $("#gg").onclick = async () => { if (!real) return; try { const e = await (await getSdk()).google(); if (e) await finish(e, "", next); } catch { err("تعذر الدخول بـ Google."); } };
+}
+function passwordRecoveryPage() {
+  const real = realProvider();
+  if (!real || real !== "supabase") return;
+  $("#app").innerHTML = `<div class="authwrap rv"><div class="authside"><h2>تعيين كلمة مرور جديدة</h2><p>اكتب كلمة المرور الجديدة لحسابك، وبعد الحفظ تقدر تسجّل دخولك بيها.</p><ul class="perks"><li>استخدم ٨ أحرف على الأقل</li><li>اختار كلمة مرور قوية ومختلفة</li></ul></div>
+    <form class="authform" id="recovery-form" novalidate>
+      <label>كلمة المرور الجديدة<span class="authpw"><input id="new-password" type="password" autocomplete="new-password" dir="ltr" placeholder="٨ أحرف على الأقل"><button class="authpw-toggle" type="button" data-eye="new-password" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg class="eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A11 11 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.1 0 2.1-.2 3-.5"/></svg></button></span></label>
+      <label>تأكيد كلمة المرور<input id="confirm-password" type="password" autocomplete="new-password" dir="ltr" placeholder="اكتبها مرة تانية"></label>
+      <p class="err" id="recovery-error" role="alert" hidden></p>
+      <button class="cta" id="save-password" type="submit">حفظ كلمة المرور الجديدة</button>
+    </form></div>`;
+  reveal();
+  document.querySelectorAll("[data-eye]").forEach((toggle) => {
+    toggle.onclick = () => {
+      const input = document.getElementById(toggle.dataset.eye);
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      toggle.setAttribute("aria-pressed", String(show));
+      toggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور");
+    };
+  });
+  const form = $("#recovery-form");
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const password = $("#new-password").value;
+    const confirm = $("#confirm-password").value;
+    const error = $("#recovery-error");
+    const button = $("#save-password");
+    const showError = (message) => { error.textContent = message; error.hidden = !message; };
+    if (password.length < 8) return showError("كلمة المرور لازم تكون ٨ أحرف على الأقل.");
+    if (password !== confirm) return showError("كلمتا المرور مش متطابقتين.");
+    button.disabled = true;
+    button.textContent = "جارٍ الحفظ...";
+    try {
+      await (await getSdk()).updatePassword(password);
+      showError("");
+      toast("تم تغيير كلمة المرور بنجاح. سجّل دخولك بالكلمة الجديدة.", "ok");
+      await (await getSdk()).signOut();
+      session = null;
+      authUserId = null;
+      ls.set("vx-session", null);
+      mode = "in";
+      location.hash = "#/login";
+      setTimeout(() => loginPage("#/profile"), 0);
+    } catch (failure) {
+      console.warn("Galaxite password recovery failed:", failure);
+      const message = String(failure?.message || "").toLowerCase();
+      showError(message.includes("password") ? "كلمة المرور لا تحقق شروط الأمان المطلوبة. جرّب كلمة أقوى." : "رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا من صفحة الدخول.");
+      button.disabled = false;
+      button.textContent = "حفظ كلمة المرور الجديدة";
+    }
+  };
 }
 async function finish(email, name, next) {
   mode = "in";
