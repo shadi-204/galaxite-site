@@ -135,8 +135,16 @@ function confetti(n = 46) {
   document.body.appendChild(box); setTimeout(() => box.remove(), 2400);
 }
 function countUp(el) {
-  const to = +el.dataset.to || 0; if (reduce() || to < 2) { el.textContent = to; return; }
-  const t0 = performance.now(); const f = (t) => { const p = Math.min(1, (t - t0) / 800); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(f); }; requestAnimationFrame(f);
+  const to = +el.dataset.to || 0;
+  const suffix = to > 0 ? (el.dataset.suffix || "") : "";
+  if (reduce() || to < 2) { el.textContent = String(to) + suffix; return; }
+  const t0 = performance.now();
+  const f = (t) => {
+    const p = Math.min(1, (t - t0) / 800);
+    el.textContent = String(Math.round(to * (1 - Math.pow(1 - p, 3)))) + suffix;
+    if (p < 1) requestAnimationFrame(f);
+  };
+  requestAnimationFrame(f);
 }
 function reveal(root = document) {
   const els = [...root.querySelectorAll(".rv:not(.in)")];
