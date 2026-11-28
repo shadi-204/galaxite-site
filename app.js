@@ -70,10 +70,17 @@ function home() {
     timer = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : setInterval(() => { if ($("#hero")) { slide = (slide + 1) % hero.length; draw(); } }, 5000);
   }
 }
-let showAll = false;
+let showAll = false, seriesQuery = "", seriesSort = "new", seriesWorkTitle = "";
 function series(w) {
+  if (seriesWorkTitle !== w.title) { seriesWorkTitle = w.title; seriesQuery = ""; seriesSort = "new"; showAll = false; }
   const chapters = chaptersFor(w);
-  const visible = showAll ? chapters : chapters.slice(0, 50);
+  let chapterList = chapters.filter((chapter) => {
+    if (!seriesQuery) return true;
+    const query = seriesQuery.trim().toLowerCase();
+    return String(chapter.number).includes(query.replace(/[^0-9]/g, "")) || String(chapter.title || ("الفصل " + chapter.number)).toLowerCase().includes(query);
+  });
+  if (seriesSort === "old") chapterList = [...chapterList].reverse();
+  const visible = showAll ? chapterList : chapterList.slice(0, 40);
   const oldest = chapters.length ? chapters[chapters.length - 1].number : null;
   const latest = chapters.length ? chapters[0].number : null;
   $("#app").innerHTML = `<a class="back" href="#/">← رجوع</a>
@@ -92,12 +99,18 @@ function series(w) {
     <small id="workRatingNote">كل حساب يقدر يضيف تقييمًا واحدًا للعمل.</small>
   </section>
   <h3 class="h">الفصول المتاحة (${chapters.length})</h3>
-  <div class="chs">${visible.map((chapter) => {
+  <div class="ctl"><input id="sq" type="search" placeholder="ابحث برقم أو اسم الفصل..." value="${esc(seriesQuery)}" aria-label="بحث في الفصول"><button id="so" class="btn">${seriesSort === "new" ? "الأحدث" : "الأقدم"}</button><button id="ma" class="btn">تحديد الكل كمقروء</button></div>
+  <div class="chl">${visible.map((chapter) => {
     const number = chapter.number;
-    const premium = VX.premium(w, number);
-    return `<a class="ch" href="#/r/${slug(w)}/${number}"><span>${esc(chapter.title || ("الفصل " + number))}</span><small>${premium ? (VX.locked(w, number) ? "● مميز" : "○ مفتوح") : "متاح"}${(prog[w.title] || 0) === number ? " · وصلت هنا" : ""}</small></a>`;
-  }).join("")}</div>${chapters.length > 50 ? `<button class="cta alt" id="more" style="margin-top:12px">${showAll ? "عرض أقل" : "عرض كل الفصول (" + chapters.length + ")"}</button>` : chapters.length ? "" : '<p class="empty">لسه مفيش فصول منشورة للعمل ده.</p>'}`;
+    const premium = VX.premium(w, number), locked = premium && VX.locked(w, number);
+    const latest = chapters[0]?.number;
+    const isRead = (prog[w.title] || 0) >= number;
+    return `<a class="chr ${locked ? "lk" : ""} ${isRead ? "rd" : ""}" href="#/r/${slug(w)}/${number}"><span class="thm" style="background:${grad(w.title + number, number)}">${locked ? "🔒" : "›"}</span><span class="cn"><b>${esc(chapter.title || ("الفصل " + number))}</b><small>${number === latest ? '<em class="new">● جديد</em>' : "فصل منشور"}${premium ? (locked ? " · مميز" : " · مفتوح") : " · متاح"}${(prog[w.title] || 0) === number ? " · وصلت هنا" : ""}</small></span>${locked ? `<span class="price">${VX.coin}<b>${VX.LOCK_COST}</b></span>` : `<span class="price ok">متاح</span>`}</a>`;
+  }).join("")}</div>${chapterList.length > visible.length ? `<button class="cta alt" id="more" style="margin-top:12px">عرض المزيد (${chapterList.length - visible.length})</button>` : showAll && chapterList.length > 40 ? `<button class="cta alt" id="more" style="margin-top:12px">عرض أقل</button>` : chapters.length ? "" : '<p class="empty">لسه مفيش فصول منشورة للعمل ده.</p>'}`;
   window.GALAXITE_ENGAGEMENT?.bindWorkRating?.(w);
+  if ($("#sq")) $("#sq").oninput = (e) => { seriesQuery = e.target.value; const p = e.target.selectionStart; series(w); const n = $("#sq"); n.focus(); n.setSelectionRange(p, p); };
+  if ($("#so")) $("#so").onclick = () => { seriesSort = seriesSort === "new" ? "old" : "new"; series(w); };
+  if ($("#ma")) $("#ma").onclick = () => { if (chapters.length) prog[w.title] = chapters[0].number; store.set("prog", prog); series(w); };
   if ($("#more")) $("#more").onclick = () => { showAll = !showAll; series(w); };
   $("#mark").onclick = () => { marks = marks.includes(w.title) ? marks.filter((t) => t !== w.title) : [...marks, w.title]; store.set("marks", marks); series(w); };
   if ($("#reportWork")) $("#reportWork").onclick = () => window.GalaxiteReports?.open({ targetType: "work", targetId: slug(w), targetTitle: w.title, targetPath: `#/s/${slug(w)}` });
