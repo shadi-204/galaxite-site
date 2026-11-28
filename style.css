@@ -162,3 +162,17 @@ body.light #tabs{background:transparent}
 .gx-admin-state h2{margin:0 0 8px}.gx-admin-state p{color:var(--mut,#a1a1aa)}
 .gx-admin-state .cta{display:inline-flex;margin-top:10px}
 @media(max-width:640px){.gx-admin-shell{padding:0 4px}.gx-admin-frame{height:calc(100vh - 125px);min-height:640px;border-radius:12px}}
+
+
+/* Fast catalog and reader placeholders (no blocking text screens). */
+.catalog-skeleton{padding-top:4px}
+.catalog-skeleton .hero{margin-top:0}
+.catalog-skeleton-row{display:flex;gap:12px;overflow:hidden;margin-top:14px}
+.catalog-skeleton-row .cover{flex:0 0 130px}
+.work-skeleton{min-height:230px}
+.skeleton-line{height:15px;max-width:360px;border-radius:999px;margin:12px 0}
+.skeleton-line.short{max-width:180px}
+.chapter-skeleton{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.chapter-skeleton>div{height:42px;border-radius:10px}
+.page-loading{width:100%;aspect-ratio:2/3;min-height:320px;display:block;margin:0 auto 5px;border-radius:4px}
+@media(max-width:640px){.catalog-skeleton-row .cover{flex-basis:112px}.page-loading{min-height:220px}}
