@@ -156,7 +156,7 @@ def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, A
         raise WorkerError("Asura source is not enabled and authorized.")
     page = max(1, int((job.get("payload") or {}).get("page") or 1))
     max_pages = max(1, min(30, int(os.getenv("ASURA_BROWSE_PAGES", "22"))))
-    # Live-probed public Asura comics route; keep page numbers explicit.
+    # Live-probed public Asura comics route; retry safely after schema migration.
     browse_url = f"https://asurascans.com/browse/comics?page={page}"
     raw, _ = _request(browse_url, {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
     listings = parse_listing(raw.decode("utf-8", "replace"), browse_url)
