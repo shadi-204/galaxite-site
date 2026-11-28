@@ -151,86 +151,126 @@ def _source_manifest(source: dict[str, Any]) -> tuple[dict[str, Any], str]:
 
 
 def _discover_asura(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
-    """Discover one Asura browse page per job to keep each run bounded."""
+    """Import one full Asura catalog page, including every chapter's metadata."""
     if source.get("authorization_status") != "authorized" or not source.get("enabled"):
         raise WorkerError("Asura source is not enabled and authorized.")
     page = max(1, int((job.get("payload") or {}).get("page") or 1))
     max_pages = max(1, min(30, int(os.getenv("ASURA_BROWSE_PAGES", "22"))))
-    # Live-probed public Asura comics route; retry safely after schema migration.
     browse_url = f"https://asurascans.com/browse/comics?page={page}"
     raw, _ = _request(browse_url, {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
     listings = parse_listing(raw.decode("utf-8", "replace"), browse_url)
     initial_chapters = max(0, min(10, int(os.getenv("ASURA_INITIAL_CHAPTERS", "1"))))
     link_works = max(0, min(20, int(os.getenv("ASURA_INITIAL_WORKS_WITH_CHAPTERS", "20"))))
-    LOG.info("Asura page %s: parsed %s works; external image links enabled for first %s works.", page, len(listings), link_works)
+    LOG.info("Asura page %s: found %s works; importing complete chapter metadata.", page, len(listings))
+
+    imported = 0
     for work_index, entry in enumerate(listings):
         detail_raw, _ = _request(entry["url"], {"Accept": "text/html"}, max_bytes=4 * 1024 * 1024)
         detail = parse_detail(detail_raw.decode("utf-8", "replace"), entry["url"])
         title = (detail.get("title") or "").strip()
         if not title:
-            # Listing-card anchors can contain the rating instead of the title;
-            # only use a clean slug fallback if detail metadata is missing.
             title = re.sub(r"-7de80a82$", "", entry["slug"], flags=re.I).replace("-", " ").title()
         if not title or re.fullmatch(r"\\d+(?:\\.\\d+)?", title):
             continue
-        existing = supabase.rows("site_works", "select=id&title=eq." + __import__("urllib.parse", fromlist=["quote"]).quote(title, safe="") + "&limit=1")
+
+        encoded_title = __import__("urllib.parse", fromlist=["quote"]).quote(title, safe="")
+        existing = supabase.rows("site_works", "select=id&title=eq." + encoded_title + "&limit=1")
+        chapters = detail.get("chapters") or []
         fields = {
-            "title": title[:300], "type": "manhwa", "genres": detail["genres"],
-            "description": detail["description"], "cover_url": detail["cover_url"],
-            "chapter_count": len(detail["chapters"]), "rating": 0,
-            "status": "مستمر", "sort_order": 0, "is_published": True,
+            "title": title[:300],
+            "type": detail.get("type") or "مانهوا",
+            "genres": detail.get("genres", []),
+            "description": detail.get("description", ""),
+            "cover_url": detail.get("cover_url"),
+            "chapter_count": len(chapters),
+            "rating": 0,
+            "status": detail.get("status") or "مستمر",
+            "sort_order": 0,
+            "is_published": True,
         }
         if existing:
             work_id = existing[0]["id"]
-            # Asura is an explicitly enabled public catalog source; keep its works visible.
             supabase.update("site_works", "id=eq." + work_id, fields)
         else:
             work_id = supabase.insert("site_works", fields)["id"]
-        chapters = detail["chapters"]
-        # Keep only the newest N chapter metadata rows per work. The full
-        # source count remains in chapter_count; importing every historical
-        # chapter one-by-one would create thousands of unnecessary API calls.
+
+        # Upsert every chapter's public metadata in small batches. This keeps
+        # the work page complete without fetching or storing chapter images.
+        chapter_rows = [
+            {
+                "work_id": work_id,
+                "chapter_number": chapter["number"],
+                "title": (chapter.get("title") or "")[:300] or None,
+                "source_url": chapter.get("url"),
+                "is_published": True,
+            }
+            for chapter in chapters
+        ]
+        for offset in range(0, len(chapter_rows), 100):
+            supabase.request(
+                "POST",
+                "/rest/v1/site_chapters?on_conflict=work_id,chapter_number",
+                chapter_rows[offset:offset + 100],
+                prefer="resolution=merge-duplicates,return=minimal",
+            )
+
         latest_chapters = chapters[-initial_chapters:] if initial_chapters else []
-        selected_for_download = (set(x["number"] for x in latest_chapters)
-                                 if initial_chapters and work_index < link_works else set())
+        selected_for_links = (
+            {item["number"] for item in latest_chapters}
+            if initial_chapters and work_index < link_works else set()
+        )
         for chapter in latest_chapters:
-            number = chapter["number"]
-            query = f"select=id&work_id=eq.{work_id}&chapter_number=eq.{number}&limit=1"
-            found = supabase.rows("site_chapters", query)
-            chapter_fields = {"work_id": work_id, "chapter_number": number,
-                              "title": chapter["title"][:300] or None,
-                              "source_url": chapter["url"], "is_published": True}
-            if found:
-                chapter_id = found[0]["id"]
-                supabase.update("site_chapters", "id=eq." + chapter_id, chapter_fields)
-            else:
-                chapter_id = supabase.insert("site_chapters", chapter_fields)["id"]
-            if number in selected_for_download:
-                prior = supabase.rows(
-                    "site_ingestion_jobs",
-                    f"select=id&external_chapter_id=eq.{chapter_id}&job_type=eq.fetch_asura_chapter&status=in.(queued,running,completed)&limit=1",
-                )
-                if not prior:
-                    supabase.insert("site_ingestion_jobs", {
-                        "source_id": source["id"], "job_type": "fetch_asura_chapter",
-                        "external_work_id": str(work_id), "external_chapter_id": str(chapter_id),
-                        "payload": {"chapter_url": chapter["url"], "source_host": "asurascans.com",
-                                    "allowed_image_hosts": ["cdn.asurascans.com"]},
-                    })
-    # Queue the next browse page separately; this avoids one very long job.
+            if chapter["number"] not in selected_for_links:
+                continue
+            chapter_query = (
+                f"select=id&work_id=eq.{work_id}"
+                f"&chapter_number=eq.{chapter['number']}&limit=1"
+            )
+            found = supabase.rows("site_chapters", chapter_query)
+            if not found:
+                continue
+            chapter_id = found[0]["id"]
+            prior = supabase.rows(
+                "site_ingestion_jobs",
+                f"select=id&external_chapter_id=eq.{chapter_id}"
+                "&job_type=eq.fetch_asura_chapter&status=in.(queued,running,completed)&limit=1",
+            )
+            if not prior:
+                supabase.insert("site_ingestion_jobs", {
+                    "source_id": source["id"],
+                    "job_type": "fetch_asura_chapter",
+                    "external_work_id": str(work_id),
+                    "external_chapter_id": str(chapter_id),
+                    "payload": {
+                        "chapter_url": chapter["url"],
+                        "source_host": "asurascans.com",
+                        "allowed_image_hosts": ["cdn.asurascans.com"],
+                    },
+                })
+        imported += 1
+
+    LOG.info("Asura page %s: imported %s/%s works with full chapter metadata.", page, imported, len(listings))
+
+    # The full page list may already be queued for a backfill. Add the next
+    # page automatically only when there is no other discovery work pending.
     if listings and page < max_pages:
         pending = supabase.rows(
             "site_ingestion_jobs",
-            f"select=id&source_id=eq.{source['id']}&job_type=eq.discover_works&status=in.(queued,running)&limit=2",
+            f"select=id&source_id=eq.{source['id']}&job_type=eq.discover_works"
+            "&status=in.(queued,running)&limit=2",
         )
         if len(pending) <= 1:
             supabase.insert("site_ingestion_jobs", {
-                "source_id": source["id"], "job_type": "discover_works",
+                "source_id": source["id"],
+                "job_type": "discover_works",
                 "payload": {"page": page + 1, "trigger": "asura_pagination"},
             })
     supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {
-        "status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(),
-        "last_error": None, "locked_at": None, "locked_by": None,
+        "status": "completed",
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "last_error": None,
+        "locked_at": None,
+        "locked_by": None,
     })
 
 
