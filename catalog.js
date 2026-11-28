@@ -18,13 +18,42 @@
         .select("id,title,type,genres,rating,status,description,chapter_count,cover_url,sort_order")
         .eq("is_published", true).order("sort_order", { ascending: true });
       if (error) throw error;
-      const rows = (data || []).map((w) => ({
-        id: w.id, title: w.title, type: w.type,
-        genres: Array.isArray(w.genres) ? w.genres : [],
-        rating: Number(w.rating || 0), status: w.status || "مستمر",
-        desc: w.description || "", chapters: Number(w.chapter_count || 0),
-        cover: w.cover_url || ""
-      }));
+      const workRows = data || [];
+      let chapterRows = [];
+      if (workRows.length) {
+        const chapterResult = await db.from("site_chapters")
+          .select("work_id,chapter_number,title,is_premium,created_at")
+          .in("work_id", workRows.map((work) => work.id))
+          .eq("is_published", true)
+          .order("chapter_number", { ascending: false });
+        if (chapterResult.error) {
+          console.warn("Published chapter list unavailable.", chapterResult.error);
+        } else {
+          chapterRows = Array.isArray(chapterResult.data) ? chapterResult.data : [];
+        }
+      }
+      const chaptersByWork = new Map();
+      for (const chapter of chapterRows) {
+        const key = String(chapter.work_id);
+        if (!chaptersByWork.has(key)) chaptersByWork.set(key, []);
+        chaptersByWork.get(key).push({
+          chapter_number: Number(chapter.chapter_number),
+          title: chapter.title || "",
+          is_premium: Boolean(chapter.is_premium),
+          created_at: chapter.created_at || null
+        });
+      }
+      const rows = workRows.map((w) => {
+        const publishedChapters = chaptersByWork.get(String(w.id)) || [];
+        return {
+          id: w.id, title: w.title, type: w.type,
+          genres: Array.isArray(w.genres) ? w.genres : [],
+          rating: Number(w.rating || 0), status: w.status || "مستمر",
+          desc: w.description || "", chapters: Number(w.chapter_count || 0),
+          publishedChapters, availableChaptersCount: publishedChapters.length,
+          cover: w.cover_url || ""
+        };
+      });
       window.GALAXITE_SET_WORKS?.(rows);
       state("ready");
       window.dispatchEvent(new Event("galaxite:catalog-updated"));
