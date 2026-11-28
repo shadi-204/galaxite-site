@@ -151,6 +151,10 @@ function catalogUnavailable() {
   }
 }
 function route() {
+  if (window.GALAXITE_PASSWORD_RECOVERY) {
+    window.VX?.passwordRecoveryPage?.();
+    return;
+  }
   const p = location.hash.slice(2).split("/");
   window.scrollTo(0, 0);
   document.title = "Galaxite | مانجا ومانهوا";
