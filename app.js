@@ -116,7 +116,7 @@ function reader(w, ch) {
   $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a><select id="cj" aria-label="انتقل لفصل">${options}</select>
   <span><button id="zo" aria-label="تصغير">−</button><button id="zi" aria-label="تكبير">+</button></span>
   <span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>
-  <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="reader-empty"><b>روابط صور الفصل لم تُحدّث بعد.</b><p>هنجلب الروابط الأصلية من المصدر عند طلب تحديث الفصل، من غير حفظ الصور عندنا.</p></div>`}</div>
+  <div class="prg"><i id="pg"></i></div><div class="pages" style="max-width:${store.get("zoom", 760)}px">${pages.length ? pages.map((p) => `<img src="${esc(p)}" alt="" loading="lazy">`).join("") : `<div class="page-loading skel" aria-hidden="true"></div>`}</div>
   <div class="rend"><p>نهاية ${esc(chapterTitle)}</p>${next !== null ? `<a class="cta" href="#/r/${slug(w)}/${next}">الفصل الأحدث ←</a>` : `<p>وصلت لأحدث فصل متاح 🎉</p>`}<button class="cta alt" id="reportChapter" type="button">الإبلاغ عن مشكلة في الفصل</button><a class="cta alt" href="#/s/${slug(w)}">كل الفصول</a></div>
   <div class="rbar"><span>${previous !== null ? `<a href="#/r/${slug(w)}/${previous}">الأقدم</a>` : ""}${next !== null ? `<a href="#/r/${slug(w)}/${next}">الأحدث</a>` : ""}</span></div>`;
 }
@@ -128,7 +128,7 @@ function readerInit(w, ch) {
   $("#zi").onclick = () => z(100); $("#zo").onclick = () => z(-100);
   const pageBox = document.querySelector(".pages");
   if (pageBox && window.GALAXITE_DB_CATALOG) {
-    pageBox.innerHTML = '<div class="reader-empty"><b>جارٍ تحميل صفحات الفصل...</b></div>';
+    pageBox.innerHTML = '<div class="page-loading skel" aria-hidden="true"></div><div class="page-loading skel" aria-hidden="true"></div>';
     window.GALAXITE_DB_CATALOG.getChapterPages(w.id || slug(w), ch).then((urls) => {
       if (!pageBox.isConnected) return;
       pageBox.innerHTML = urls.length
@@ -175,13 +175,45 @@ document.addEventListener("error", (e) => {
 function catalogUnavailable() {
   const state = window.GALAXITE_CATALOG_STATE || { status: "loading" };
   if (state.status === "loading") {
-    $("#app").innerHTML = '<div class="empty"><h2>جارٍ تحميل مكتبة Galaxite</h2><p>بنحمّل الأعمال والفصول من قاعدة البيانات.</p></div>';
+    $("#app").innerHTML = `<div class="catalog-skeleton"><div class="skel hero"></div><div class="catalog-skeleton-row">${"<div class='cover skel'></div>".repeat(8)}</div></div>`;
   } else if (state.status === "error") {
     $("#app").innerHTML = '<div class="empty"><h2>مكتبة الأعمال غير متاحة حاليًا</h2><p>تعذر الاتصال بقاعدة البيانات. جرّب إعادة التحميل.</p><button class="cta" id="retryCatalog">إعادة المحاولة</button></div>';
     $("#retryCatalog").onclick = () => window.GALAXITE_DB_CATALOG?.refresh();
   } else {
     $("#app").innerHTML = '<div class="empty"><h2>لسه مفيش أعمال منشورة</h2><p>الأعمال هتظهر هنا بعد نشرها من لوحة الإدارة.</p></div>';
   }
+}
+const pendingWorkLoads = new Set();
+function workRouteSkeleton(w, mode) {
+  if (mode === "s") {
+    $("#app").innerHTML = `<a class="back" href="#/">← رجوع</a><div class="top work-skeleton"><div class="cover big skel"></div><div><div class="skel skeleton-line"></div><div class="skel skeleton-line short"></div><div class="skel skeleton-line"></div><div class="skel skeleton-line"></div></div></div><h3 class="h">الفصول</h3><div class="chapter-skeleton">${"<div class='skel'></div>".repeat(12)}</div>`;
+  } else {
+    $("#app").innerHTML = `<div class="rbar"><a class="back" href="#/s/${slug(w)}">← ${esc(w.title)}</a></div><div class="prg"><i></i></div><div class="pages"><div class="page-loading skel"></div><div class="page-loading skel"></div></div>`;
+  }
+}
+function ensureWorkChapters(w, mode, routeHash) {
+  const api = window.GALAXITE_DB_CATALOG;
+  const cached = api?.getCachedWorkChapters?.(w.id);
+  if (Array.isArray(cached)) {
+    w.publishedChapters = cached;
+    api.getWorkChapters?.(w.id).catch((error) => console.warn("Chapter refresh skipped.", error));
+    return true;
+  }
+  if (Array.isArray(w.publishedChapters) || w._chapterLoadFailed) return true;
+  workRouteSkeleton(w, mode);
+  const key = String(w.id || w.title) + ":" + routeHash;
+  if (!pendingWorkLoads.has(key)) {
+    pendingWorkLoads.add(key);
+    api?.getWorkChapters?.(w.id).then((rows) => {
+      w.publishedChapters = Array.isArray(rows) ? rows : [];
+      if (location.hash === routeHash) route();
+    }).catch((error) => {
+      console.warn("Work chapter list unavailable.", error);
+      w._chapterLoadFailed = true;
+      if (location.hash === routeHash) route();
+    }).finally(() => pendingWorkLoads.delete(key));
+  }
+  return false;
 }
 function route() {
   if (window.GALAXITE_PASSWORD_RECOVERY) {
@@ -195,6 +227,7 @@ function route() {
   if (!WORKS.length && !["login", "profile", "store"].includes(p[0])) return catalogUnavailable();
   const w = p[1] && byTitle(decodeURIComponent(p[1]));
   if ((p[0] === "s" || p[0] === "r") && !w) return notFound();
+  if ((p[0] === "s" || p[0] === "r") && w && !ensureWorkChapters(w, p[0], location.hash)) return;
   if (p[0] === "s" && w) { document.title = w.title + " | Galaxite"; return series(w); }
   if (p[0] === "r" && w) { document.title = `${w.title} - الفصل ${+p[2] || 1}`; reader(w, +p[2] || 1); return readerInit(w, Math.max(1, Math.min(w.chapters, +p[2] || 1))); }
   if (p[0] === "login") { document.title = "دخول | Galaxite"; VX.loginPage(); return post(p); }
@@ -228,9 +261,15 @@ $("#theme").onclick = () => { light = !light; store.set("light", light); applyTh
 window.addEventListener("hashchange", route);
 window.addEventListener("galaxite:catalog-updated", route);
 window.addEventListener("galaxite:catalog-state", () => { if (!WORKS.length) catalogUnavailable(); });
+window.addEventListener("galaxite:work-chapters-updated", (event) => {
+  const parts = location.hash.slice(2).split("/");
+  if (!["s", "r"].includes(parts[0])) return;
+  const work = parts[1] && byTitle(decodeURIComponent(parts[1]));
+  if (work && String(work.id) === String(event.detail?.workId) && !pendingWorkLoads.size) route();
+});
 applyTheme();
-$("#app").innerHTML = `<div class="skel hero"></div><div class="row">${"<div class='card'><div class='cover skel'></div></div>".repeat(8)}</div>`;
-setTimeout(route, 350);
+if (!WORKS.length) catalogUnavailable();
+else route();
 
 document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#q").focus(); } });
 
