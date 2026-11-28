@@ -41,14 +41,17 @@ function rowOf(title, list) {
   return `<div class="rh"><h3 class="h">${title}</h3><span class="arr"><button data-d="1" aria-label="السابق">›</button><button data-d="-1" aria-label="التالي">‹</button></span></div><div class="row">${list.map(cardM).join("")}</div>`;
 }
 
-let genreTickerFrame = 0;
+let genreTickerFrame = 0, genreTickerController = null;
 function initGenreTicker(root = document) {
   const viewport = root.querySelector(".gstrip");
   const track = viewport?.querySelector(".gstrip-track");
   const firstSet = track?.querySelector(".gstrip-set:not([aria-hidden='true'])");
   if (!viewport || !track || !firstSet) return;
 
+  genreTickerController?.abort();
   if (genreTickerFrame) cancelAnimationFrame(genreTickerFrame);
+  genreTickerController = new AbortController();
+  const { signal } = genreTickerController;
   let loopWidth = 0, offset = 0, lastFrame = 0;
   let pointer = null, dragging = false, hovered = false, focused = false;
   let suppressClick = false;
@@ -96,26 +99,26 @@ function initGenreTicker(root = document) {
     viewport.classList.remove("is-dragging");
   };
 
-  viewport.addEventListener("pointerdown", onDown);
-  window.addEventListener("pointermove", onMove, { passive: true });
-  window.addEventListener("pointerup", onUp);
-  window.addEventListener("pointercancel", onUp);
-  viewport.addEventListener("pointerenter", () => { hovered = true; });
-  viewport.addEventListener("pointerleave", () => { hovered = false; });
-  viewport.addEventListener("focusin", () => { focused = true; });
-  viewport.addEventListener("focusout", (event) => { focused = viewport.contains(event.relatedTarget); });
+  viewport.addEventListener("pointerdown", onDown, { signal });
+  window.addEventListener("pointermove", onMove, { passive: true, signal });
+  window.addEventListener("pointerup", onUp, { signal });
+  window.addEventListener("pointercancel", onUp, { signal });
+  viewport.addEventListener("pointerenter", () => { hovered = true; }, { signal });
+  viewport.addEventListener("pointerleave", () => { hovered = false; }, { signal });
+  viewport.addEventListener("focusin", () => { focused = true; }, { signal });
+  viewport.addEventListener("focusout", (event) => { focused = viewport.contains(event.relatedTarget); }, { signal });
   viewport.addEventListener("click", (event) => {
     if (!suppressClick) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     suppressClick = false;
-  }, true);
+  }, { capture: true, signal });
   viewport.addEventListener("keydown", (event) => {
     if (event.target !== viewport) return;
     if (event.key === "ArrowLeft") { offset = normalize(offset + 100); paint(); }
     if (event.key === "ArrowRight") { offset = normalize(offset - 100); paint(); }
-  });
-  window.addEventListener("resize", measure, { passive: true });
+  }, { signal });
+  window.addEventListener("resize", measure, { passive: true, signal });
 
   const animate = (now) => {
     if (!viewport.isConnected) {
