@@ -52,14 +52,16 @@ async function getSdk() {
       current: () => new Promise((r) => { const u = a.onAuthStateChanged((x) => { u(); r(x ? x.email : null); }); })
     };
   } else if (p === "supabase") {
-    await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2");
-    const c = supabase.createClient(CFG.supabase.url, CFG.supabase.anonKey);
+    const c = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+    if (!c) throw new Error("supabase_unavailable");
     const ok = ({ data, error }) => { if (error) throw error; return data; };
     sdk = {
       signUp: async (e, pw) => { const data = ok(await c.auth.signUp({ email: e, password: pw })); return { email: data.user?.email || e, needsConfirmation: !data.session }; },
       signIn: async (e, pw) => ok(await c.auth.signInWithPassword({ email: e, password: pw })).user.email,
       google: async () => { ok(await c.auth.signInWithOAuth({ provider: "google" })); return null; },
       reset: async (e) => ok(await c.auth.resetPasswordForEmail(e)),
+      resend: async (e) => ok(await c.auth.resend({ type: "signup", email: e })),
+      currentUser: async () => ok(await c.auth.getUser()).user,
       signOut: () => c.auth.signOut(),
       current: async () => (await c.auth.getSession()).data.session?.user?.email || null
     };
@@ -69,10 +71,21 @@ async function getSdk() {
 
 /* ---------- حالة المستخدم ---------- */
 let session = ls.get("vx-session", null);       // البريد أو null
+let authUserId = null;
 const keyOf = (e) => "vx-u:" + String(e).toLowerCase();
 const blank = (email, name) => ({ email, name: name || String(email).split("@")[0], bio: "", avatar: AVATARS[0], coins: 20, vipUntil: 0, unlocked: [], tx: [{ t: Date.now(), d: "هدية الترحيب", c: 20 }], xp: 0, read: [], daily: { last: "", streak: 0 }, joined: Date.now() });
 const me = () => session ? { ...blank(session), ...ls.get(keyOf(session), {}) } : null;
-const put = (u) => { ls.set(keyOf(u.email), u); refreshHead(); };
+const put = (u) => {
+  ls.set(keyOf(u.email), u);
+  refreshHead();
+  if (authUserId && realProvider() === "supabase") {
+    window.GALAXITE_GET_SUPABASE_CLIENT?.().then((db) => db?.from("profiles")
+      .update({ display_name: u.name || String(u.email).split("@")[0], bio: u.bio || "" })
+      .eq("id", authUserId))
+      .then(({ error }) => { if (error) console.warn("Galaxite profile sync failed.", error); })
+      .catch((error) => console.warn("Galaxite profile sync failed.", error));
+  }
+};
 const isVip = (u) => u && u.vipUntil > Date.now();
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -154,7 +167,7 @@ function loginPage(next) {
     pwToggle.setAttribute("aria-label", show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور");
   };
   document.querySelectorAll(".seg button").forEach((b) => (b.onclick = () => { mode = b.dataset.m; loginPage(next); }));
-  const err = (t) => { const e = $("#ae-err"); e.textContent = t; e.hidden = !t; };
+  const err = (t) => { document.getElementById("resend-confirmation")?.remove(); const e = $("#ae-err"); e.textContent = t; e.hidden = !t; };
   const submit = async () => {
     err("");
     const email = $("#ae").value.trim().toLowerCase(), pw = $("#ap").value, name = $("#an")?.value.trim();
@@ -192,30 +205,54 @@ function loginPage(next) {
     } catch (x) {
       const raw = String(x?.message || "");
       const lower = raw.toLowerCase();
+      const code = String(x?.code || x?.error_code || "").toLowerCase();
+      console.warn("Galaxite account action failed:", code || "unknown", raw);
       let msg = {
         exists: "البريد ده مسجل قبل كده. جرّب تسجل دخول.",
-        nouser: ((document.getElementById("ae")||{}).value||"").trim().toLowerCase() === String((window.AUTH_CONFIG||{}).ownerEmail||"").toLowerCase() ? "ده بريد لوحة الإدارة، مش حساب قارئ. افتح ملف admin.html وهناك تختار كلمة مرور أول مرة. وهنا اعمل حساب قارئ عادي ببريد وكلمة مرور من اختيارك." : "مفيش حساب بالبريد ده. اعمل حساب جديد.",
-        bad: "كلمة المرور غلط."
+        nouser: ((document.getElementById("ae")||{}).value||"").trim().toLowerCase() === String((window.AUTH_CONFIG||{}).ownerEmail||"").toLowerCase() ? "ده بريد لوحة الإدارة، مش حساب قارئ. افتح لوحة الإدارة بحساب Owner الحقيقي. وهنا استخدم حساب قارئ عادي." : "مفيش حساب بالبريد ده. اعمل حساب جديد.",
+        bad: "كلمة المرور غير صحيحة. راجعها وحاول تاني."
       }[x.message];
-      if (!msg && lower.includes("invalid login credentials")) {
-        if (email === String(CFG.ownerEmail || "").trim().toLowerCase()) {
-          mode = "up";
-          loginPage(next);
-          $("#ae").value = email;
-          $("#ap").value = pw;
-          const e = $("#ae-err");
-          e.textContent = "بريد الإدارة ده لسه ملوش حساب في Supabase. اضغط «إنشاء الحساب» بنفس البريد، وبعدها أكّد رسالة البريد لو وصلتك.";
-          e.hidden = false;
-          return;
-        }
-        msg = "البريد أو كلمة المرور غير صحيحة. تأكد من بيانات الحساب، أو استخدم نسيت كلمة المرور.";
+      if (!msg && (code === "email_not_confirmed" || lower.includes("email not confirmed") || lower.includes("email_not_confirmed"))) {
+        msg = "الحساب لسه محتاج تأكيد البريد. افتح رسالة التأكيد اللي وصلت على بريدك، واضغط رابط التأكيد، وبعدها ارجع سجّل دخول.";
       }
-      if (!msg && lower.includes("email not confirmed")) msg = "لازم تأكد بريدك الإلكتروني من رسالة Supabase قبل تسجيل الدخول.";
-      if (!msg && (lower.includes("user already registered") || lower.includes("already registered"))) msg = "البريد مسجل بالفعل. ارجع لتبويب دخول بدل إنشاء حساب جديد.";
-      if (!msg && (lower.includes("password") && (lower.includes("at least") || lower.includes("characters")))) msg = "كلمة المرور لا تحقق شروط الأمان المطلوبة.";
-      if (!msg && (lower.includes("fetch") || lower.includes("network"))) msg = "تعذر الاتصال بخدمة تسجيل الدخول. جرّب تاني وتأكد من اتصال الإنترنت.";
-      if (!msg) msg = raw ? "Supabase رفض تسجيل الدخول: " + raw : "ما قدرناش نكمل العملية. راجع البيانات أو إعدادات الربط.";
-      err(msg); btn.disabled = false; btn.textContent = mode === "in" ? "دخول" : "إنشاء الحساب";
+      if (!msg && (code === "invalid_credentials" || lower.includes("invalid login credentials"))) {
+        msg = "البريد أو كلمة المرور غير صحيحة. تأكد من البيانات، أو استخدم «نسيت كلمة المرور؟».";
+      }
+      if (!msg && (lower.includes("user already registered") || lower.includes("already registered"))) {
+        msg = "البريد مسجل بالفعل. ارجع لتبويب دخول بدل إنشاء حساب جديد.";
+      }
+      if (!msg && (lower.includes("password") && (lower.includes("at least") || lower.includes("characters") || lower.includes("weak")))) {
+        msg = "كلمة المرور لا تحقق شروط الأمان المطلوبة. استخدم ٨ أحرف على الأقل.";
+      }
+      if (!msg && (x.message === "supabase_unavailable" || x.message === "load" || lower.includes("cdn") || lower.includes("network") || lower.includes("fetch") || lower.includes("timed out"))) {
+        msg = "تعذر تحميل خدمة تسجيل الدخول أو الاتصال بها. جرّب تحديث الصفحة، وتأكد من اتصال الإنترنت، ثم أعد المحاولة.";
+      }
+      if (!msg) msg = "حصلت مشكلة أثناء تسجيل الدخول أو إنشاء الحساب. راجع البيانات وحاول مرة أخرى.";
+      err(msg);
+      if (code === "email_not_confirmed" || lower.includes("email not confirmed") || lower.includes("email_not_confirmed")) {
+        const resend = document.createElement("button");
+        resend.id = "resend-confirmation";
+        resend.type = "button";
+        resend.className = "lnk";
+        resend.textContent = "إعادة إرسال رسالة التأكيد";
+        resend.onclick = async () => {
+          resend.disabled = true;
+          resend.textContent = "جارٍ الإرسال...";
+          try {
+            await (await getSdk()).resend(email);
+            err("طلبنا إرسال رسالة تأكيد جديدة. راجع صندوق الوارد والرسائل غير المرغوب فيها.");
+          } catch (resendError) {
+            console.warn("Galaxite confirmation resend failed:", resendError);
+            err("تعذر إرسال رسالة التأكيد الآن. حاول لاحقًا أو راجع إعدادات البريد.");
+            resend.disabled = false;
+            resend.textContent = "إعادة إرسال رسالة التأكيد";
+            $("#ae-err").insertAdjacentElement("afterend", resend);
+          }
+        };
+        $("#ae-err").insertAdjacentElement("afterend", resend);
+      }
+      btn.disabled = false;
+      btn.textContent = mode === "in" ? "دخول" : "إنشاء الحساب";
     }
   };
   $("#asub").onclick = submit;
@@ -229,19 +266,80 @@ function loginPage(next) {
   $("#gg").onclick = async () => { if (!real) return; try { const e = await (await getSdk()).google(); if (e) await finish(e, "", next); } catch { err("تعذر الدخول بـ Google."); } };
 }
 async function finish(email, name, next) {
-  mode = "in"; session = email; ls.set("vx-session", email);
-  const k = keyOf(email); const ex = ls.get(k, null);
-  put(ex ? { ...blank(email), ...ex } : blank(email, name));
-  toast("أهلاً " + (me().name), "ok"); confetti(30);
+  mode = "in";
+  if (realProvider() === "supabase") {
+    try {
+      const db = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+      const { data: { user }, error } = await db.auth.getUser();
+      if (error) throw error;
+      authUserId = user?.id || null;
+    } catch (error) {
+      console.warn("Galaxite could not read the authenticated user profile.", error);
+    }
+  }
+  session = email;
+  ls.set("vx-session", email);
+  const k = keyOf(email);
+  const ex = ls.get(k, null);
+  const profile = ex ? { ...blank(email), ...ex } : blank(email, name);
+  put(profile);
+  if (authUserId && realProvider() === "supabase") {
+    try {
+      const db = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+      const { error } = await db.from("profiles").upsert({
+        id: authUserId,
+        display_name: profile.name || String(email).split("@")[0],
+        bio: profile.bio || ""
+      }, { onConflict: "id" });
+      if (error) console.warn("Galaxite profile create/update failed.", error);
+    } catch (error) {
+      console.warn("Galaxite profile create/update failed.", error);
+    }
+  }
+  toast("أهلاً " + (me().name), "ok");
+  confetti(30);
   location.hash = next || "#/profile";
 }
 async function logout() {
   try { if (realProvider()) await (await getSdk()).signOut(); } catch {}
-  session = null; ls.set("vx-session", null); refreshHead(); toast("تم تسجيل الخروج"); location.hash = "#/";
+  session = null; authUserId = null; ls.set("vx-session", null); refreshHead(); toast("تم تسجيل الخروج"); location.hash = "#/";
 }
 async function restore() {
   if (!realProvider()) return;
-  try { const e = await (await getSdk()).current(); if (e) { session = e; ls.set("vx-session", e); if (!ls.get(keyOf(e), null)) put(blank(e)); } else if (session) { session = null; ls.set("vx-session", null); } refreshHead(); } catch {}
+  try {
+    const s = await getSdk();
+    const email = await s.current();
+    if (!email) {
+      authUserId = null;
+      if (session) { session = null; ls.set("vx-session", null); }
+      refreshHead();
+      return;
+    }
+    session = email;
+    ls.set("vx-session", email);
+    let profile = { ...blank(email), ...(ls.get(keyOf(email), {}) || {}) };
+    if (realProvider() === "supabase") {
+      const db = await window.GALAXITE_GET_SUPABASE_CLIENT?.();
+      const user = await s.currentUser?.();
+      authUserId = user?.id || null;
+      if (authUserId) {
+        const { data, error } = await db.from("profiles")
+          .select("display_name,bio").eq("id", authUserId).maybeSingle();
+        if (error) console.warn("Galaxite profile load failed.", error);
+        if (data) profile = { ...profile, name: data.display_name || profile.name, bio: data.bio || "" };
+        else {
+          const { error: insertError } = await db.from("profiles").upsert({
+            id: authUserId, display_name: profile.name, bio: profile.bio || ""
+          }, { onConflict: "id" });
+          if (insertError) console.warn("Galaxite profile bootstrap failed.", insertError);
+        }
+      }
+    }
+    put(profile);
+    refreshHead();
+  } catch (error) {
+    console.warn("Galaxite session restore failed.", error);
+  }
 }
 
 /* ---------- المكافآت والتتبع ---------- */

@@ -1,0 +1,52 @@
+name: Validate and build Galaxite preview
+
+on:
+  push:
+    branches:
+      - backup/pre-galaxite-overhaul-2026-11-28
+      - galaxite-preview
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate JavaScript, HTML assets, service worker, and public configuration
+        run: node scripts/validate-galaxite.mjs
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate OCR worker source and unit tests
+        run: |
+          python -m compileall -q worker
+          python -m unittest discover -s worker -p "test_*.py" -v
+
+      - name: Build static preview
+        run: node scripts/build-galaxite-preview.mjs
+
+      - name: Package preview
+        run: |
+          cd dist
+          zip -qr "$GITHUB_WORKSPACE/galaxite-static-preview.zip" .
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: galaxite-static-preview
+          path: galaxite-static-preview.zip
+          if-no-files-found: error
+          retention-days: 14

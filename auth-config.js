@@ -2,10 +2,9 @@
 // مفتاح Supabase publishable مخصص للاستخدام في المتصفح؛ لا تضع service_role key هنا.
 window.AUTH_CONFIG = {
   provider: "supabase",
-  ownerEmail: "ownermail@gmail.com",
   firebase: { apiKey: "", authDomain: "", projectId: "", appId: "" },
   supabase: {
-    url: "https://daqjqiuyrxtlutqjraxc.supabase.co",
-    anonKey: "sb_publishable_aaGiJ_QTZ-9kSuQli6Klyg_ko496RRj"
+    url: "https://rlwdimrbrbkvjqjsfmnl.supabase.co",
+    anonKey: "sb_publishable_0_SCF5uAaN3b9oQECQLHeQ_OZwbwfN7"
   }
 };

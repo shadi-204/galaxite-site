@@ -1,12 +1,12 @@
-/* v4: تصفح بفلتر جانبي، التصنيفات ككروت، أحدث الفصول، الأكثر قراءة بتبويبات، المهام، الدعم، كوكيز، نافذة الجديد. بيانات تجريبية. */
+/* v4: تصفح بفلتر جانبي وتصنيفات. لا توجد إحصاءات مشاهدات فعلية حتى الآن. */
 (() => {
 const nm = (n) => Number(n).toLocaleString("ar-EG");
 const seed = (s) => { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
 const hue = (t) => seed(t) % 360;
 const grad = (t) => `linear-gradient(135deg,hsl(${hue(t)},60%,40%),hsl(${(hue(t) + 60) % 360},55%,22%))`;
 const GEN = [...new Set(WORKS.flatMap((w) => w.genres || []))];
-const pop = (w, k) => (seed(w.title + k) % 9000) + w.rating * 300;
-const latestList = () => WORKS.map((w, i) => ({ w, ch: w.chapters, ago: (seed(w.title) % 70) + i * 3 })).sort((a, b) => a.ago - b.ago);
+const pop = (w) => Number(w.rating || 0);
+const latestList = () => WORKS.map((w) => ({ w, ch: w.chapters, ago: null })).sort((a, b) => b.ch - a.ch);
 const agoTxt = (m) => (m < 60 ? `منذ ${nm(m)} د` : m < 1440 ? `منذ ${nm(Math.round(m / 60))} س` : `منذ ${nm(Math.round(m / 1440))} يوم`);
 const LS = { g: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, s: (k, v) => localStorage.setItem(k, JSON.stringify(v)) };
 const ic = (p) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -15,7 +15,7 @@ const ic = (p) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" s
 let bf = { q: "", st: "", ty: "", sort: "rating", g: [] };
 function browse() {
   const list = WORKS.filter((w) => hit(w, bf.q) && (!bf.st || w.status === bf.st) && (!bf.ty || w.type === bf.ty) && bf.g.every((g) => (w.genres || []).includes(g)))
-    .sort((a, b) => bf.sort === "rating" ? b.rating - a.rating : bf.sort === "pop" ? pop(b, "a") - pop(a, "a") : bf.sort === "ch" ? b.chapters - a.chapters : a.title.localeCompare(b.title));
+    .sort((a, b) => bf.sort === "rating" ? b.rating - a.rating : bf.sort === "pop" ? pop(b) - pop(a) : bf.sort === "ch" ? b.chapters - a.chapters : a.title.localeCompare(b.title));
   const chip = (k, v, l) => `<button class="v4chip ${bf[k] === v ? "on" : ""}" data-k="${k}" data-v="${v}">${l}</button>`;
   $("#app").innerHTML = `<h2 class="v4h"><span></span>تصفح الأعمال</h2><p class="v4sub">ابحث وفلتر حسب الحالة والنوع والتصنيف.</p>
   <div class="v4bw"><aside class="v4side"><h3>تصفية النتائج</h3>
@@ -38,25 +38,33 @@ function cats() {
 }
 /* ---- أحدث الفصول ---- */
 let lt = "all";
-function latest() {
-  const l = latestList().filter((x) => lt === "all" || x.w.type === lt);
-  $("#app").innerHTML = `<h2 class="v4h"><span></span>أحدث الفصول</h2><div class="v4tabs">${[["all", "الكل"], ["manga", "مانجا"], ["manhwa", "مانهوا"]].map(([k, v]) => `<button class="${lt === k ? "on" : ""}" data-t="${k}">${v}</button>`).join("")}</div>
-  <div class="v4lat">${l.map(({ w, ch, ago }) => `<a class="v4lc" href="#/r/${slug(w)}/${ch}"><div class="v4th">${cover(w)}</div><div><b dir="auto">${esc(w.title)}</b><small>الفصل ${nm(ch)}</small><small>${agoTxt(ago)}</small></div>${ago < 600 ? `<i class="v4new">جديد</i>` : ""}</a>`).join("")}</div>`;
+async function latest() {
+  $("#app").innerHTML = `<h2 class="v4h"><span></span>أحدث الفصول</h2><div class="v4tabs">${[["all", "الكل"], ["manga", "مانجا"], ["manhwa", "مانهوا"]].map(([k, v]) => `<button class="${lt === k ? "on" : ""}" data-t="${k}">${v}</button>`).join("")}</div><p class="v4sub">جارٍ تحميل أحدث الفصول المنشورة...</p><div class="v4lat" id="v4-latest-list"></div>`;
   document.querySelectorAll(".v4tabs button").forEach((b) => (b.onclick = () => { lt = b.dataset.t; latest(); }));
+  const list = $("#v4-latest-list");
+  if (!list) return;
+  const rows = await window.GALAXITE_DB_CATALOG?.getLatestChapters(60) || [];
+  if (!list.isConnected) return;
+  const entries = rows.map((row) => ({ row, w: WORKS.find((work) => String(work.id) === String(row.work_id)) })).filter((x) => x.w && (lt === "all" || x.w.type === lt));
+  list.innerHTML = entries.length ? entries.map(({row,w}) => {
+    const stamp = row.created_at ? new Date(row.created_at).toLocaleDateString("ar-EG") : "تاريخ غير متاح";
+    const chapterTitle = row.title || ("الفصل " + nm(row.chapter_number));
+    return `<a class="v4lc" href="#/r/${slug(w)}/${Number(row.chapter_number)}"><div class="v4th">${cover(w)}</div><div><b dir="auto">${esc(w.title)}</b><small>${esc(chapterTitle)}</small><small>${stamp}</small></div></a>`;
+  }).join("") : '<p class="empty">لا توجد فصول منشورة متاحة في قاعدة البيانات.</p>';
 }
-/* ---- الأكثر قراءة ---- */
+/* ---- الأعلى تقييمًا ---- */
 function rankBlock(el) {
   let per = "d";
   const draw = () => {
-    const K = { d: ["اليوم", "24 ساعة"], w: ["هذا الأسبوع", "7 أيام"], m: ["هذا الشهر", "30 يوما"] };
-    const l = [...WORKS].sort((a, b) => pop(b, per) - pop(a, per)).slice(0, 8);
-    el.innerHTML = `<h3 class="h">الأكثر قراءة</h3><div class="v4tabs">${Object.entries(K).map(([k, v]) => `<button class="${per === k ? "on" : ""}" data-p="${k}">${v[0]}</button>`).join("")}</div>
-    <ol class="v4rank">${l.map((w, i) => `<li class="${i ? "" : "first"}"><a href="#/s/${slug(w)}"><b>${nm(i + 1)}</b><div class="v4th s">${cover(w)}</div><span dir="auto">${esc(w.title)}<small>الفصل ${nm(w.chapters)} · ${nm(Math.round(pop(w, per)))} قراءة</small></span></a></li>`).join("")}</ol>`;
+    const K = { d: ["الأعلى تقييمًا"] };
+    const l = [...WORKS].sort((a, b) => pop(b) - pop(a)).slice(0, 8);
+    el.innerHTML = `<h3 class="h">الأعلى تقييمًا</h3><div class="v4tabs">${Object.entries(K).map(([k, v]) => `<button class="${per === k ? "on" : ""}" data-p="${k}">${v[0]}</button>`).join("")}</div>
+    <ol class="v4rank">${l.map((w, i) => `<li class="${i ? "" : "first"}"><a href="#/s/${slug(w)}"><b>${nm(i + 1)}</b><div class="v4th s">${cover(w)}</div><span dir="auto">${esc(w.title)}<small>الفصل ${nm(w.chapters)} · تقييم ${Number(w.rating || 0).toFixed(1)}</small></span></a></li>`).join("")}</ol>`;
     el.querySelectorAll("button").forEach((b) => (b.onclick = () => { per = b.dataset.p; draw(); }));
   };
   draw();
 }
-function rank() { $("#app").innerHTML = `<h2 class="v4h"><span></span>الأكثر قراءة</h2><div id="rk"></div>`; rankBlock($("#rk")); }
+function rank() { $("#app").innerHTML = `<h2 class="v4h"><span></span>الأعلى تقييمًا</h2><div id="rk"></div>`; rankBlock($("#rk")); }
 /* ---- المهام والمستويات ---- */
 const MIS = [["دخول اليوم", 1, 5], ["اقرأ 3 فصول", 3, 15], ["أضف عملا للمفضلة", 1, 10], ["اكتب تعليقا", 1, 10], ["شارك عملا", 1, 5]];
 function missions() {
@@ -79,10 +87,10 @@ function support() {
   $("#v4d").onclick = () => VX.toast("وضع تجريبي: لا دفع حقيقي", "ok");
 }
 V3.pages.browse = browse; V3.pages.cats = cats; V3.pages.latest = latest; V3.pages.rank = rank; V3.pages.missions = missions; V3.pages.support = support;
-const T = { browse: "تصفح", cats: "التصنيفات", latest: "أحدث الفصول", rank: "الأكثر قراءة", missions: "المهام", support: "ادعمنا" };
+const T = { browse: "تصفح", cats: "التصنيفات", latest: "أحدث الفصول", rank: "الأعلى تقييمًا", missions: "المهام", support: "ادعمنا" };
 addEventListener("hashchange", () => setTimeout(() => { const p = location.hash.slice(2).split("/")[0]; if (T[p]) document.title = T[p] + " | Galaxite"; }, 0));
 
-/* ---- الرئيسية: الأكثر قراءة + تصنيفات ---- */
+/* ---- الرئيسية: الأعلى تقييمًا + تصنيفات ---- */
 function enrich() {
   if (location.hash && location.hash !== "#/" && location.hash !== "#") return;
   const a = $("#app"); if (!a.querySelector(".gstrip, .row, .hero") || a.querySelector("#v4home")) return;
@@ -93,12 +101,12 @@ function enrich() {
 new MutationObserver(() => { if (!$("#v4home")) enrich(); }).observe($("#app"), { childList: true });
 
 /* ---- قائمة التنقل ---- */
-const nav = $("#mnav"); if (nav) nav.innerHTML = `<a href="#/" data-r="home">الرئيسية</a><a href="#/browse">تصفح</a><a href="#/latest">أحدث الفصول</a><a href="#/cats">التصنيفات</a><a href="#/rank">الأكثر قراءة</a><a href="#/store" data-r="store">المتجر</a><a href="#/community">المجتمع</a><a href="#/top">المتصدرين</a><a href="#/missions">المهام</a><a href="#/support">ادعمنا</a>`;
-const ft = document.querySelector(".foot nav"); if (ft) ft.insertAdjacentHTML("beforeend", `<a href="#/support">ادعمنا</a><a href="team.html">لوحة فريق الترجمة</a><a href="siteadmin.html">لوحة مدير الموقع</a>`);
+const nav = $("#mnav"); if (nav) nav.innerHTML = `<a href="#/" data-r="home">الرئيسية</a><a href="#/browse">تصفح</a><a href="#/latest">أحدث الفصول</a><a href="#/cats">التصنيفات</a><a href="#/rank">الأعلى تقييمًا</a><a href="#/store" data-r="store">المتجر</a><a href="#/community">المجتمع</a><a href="#/top">المتصدرين</a><a href="#/missions">المهام</a><a href="#/support">ادعمنا</a>`;
+const ft = document.querySelector(".foot nav"); if (ft) ft.insertAdjacentHTML("beforeend", `<a href="#/support">ادعمنا</a>`);
 
 /* ---- كوكيز ونافذة الجديد ---- */
 if (!LS.g("v4ck", 0)) { const c = document.createElement("div"); c.className = "v4ck"; c.innerHTML = `<div><b>تجربة قراءة أفضل</b><small>نحفظ تقدمك وإعداداتك على جهازك فقط.</small></div><span><button class="cta" id="ck1">موافق</button><button class="cta alt" id="ck2">رفض</button></span>`; document.body.appendChild(c); c.querySelectorAll("button").forEach((b) => (b.onclick = () => { LS.s("v4ck", 1); c.remove(); })); }
-const NEW = [["تصفح بفلتر جانبي", "فلتر بالحالة والنوع والتصنيف."], ["الأكثر قراءة", "اليوم والأسبوع والشهر."], ["المهام والمستويات", "اجمع XP وافتح إطارات الملف."], ["لوحات للفرق", "لوحة فريق ولوحة مدير الموقع."]];
+const NEW = [["تصفح بفلتر جانبي", "فلتر بالحالة والنوع والتصنيف."], ["الأعلى تقييمًا", "اليوم والأسبوع والشهر."], ["المهام والمستويات", "اجمع XP وافتح إطارات الملف."], ["لوحات للفرق", "لوحة فريق ولوحة مدير الموقع."]];
 if (!LS.g("v4new", 0)) setTimeout(() => {
   let i = 0; const o = document.createElement("div"); o.className = "v4ov";
   const d = () => { o.innerHTML = `<div class="v4md"><small>الجديد في الموقع · ${nm(i + 1)} من ${nm(NEW.length)}</small><h3>${NEW[i][0]}</h3><p>${NEW[i][1]}</p><div><button class="cta alt" id="nx0">تخطي</button><button class="cta" id="nx1">${i == NEW.length - 1 ? "ابدأ" : "التالي"}</button></div></div>`; o.querySelector("#nx0").onclick = end; o.querySelector("#nx1").onclick = () => (++i >= NEW.length ? end() : d()); };
