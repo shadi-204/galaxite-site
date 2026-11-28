@@ -85,7 +85,7 @@ for (const [htmlName, required] of Object.entries(requiredScripts)) {
   }
   const html = readFileSync(file, "utf8");
   for (const script of required) {
-    const scriptPattern = /<script\\b[^>]*src=["']([^"']+)["'][^>]*>/gi;
+    const scriptPattern = /<script\b[^>]*src=["']([^"']+)["'][^>]*>/gi;
     const hasScript = [...html.matchAll(scriptPattern)].some((match) => match[1].split("?")[0] === script);
     if (!hasScript) {
       fail(htmlName + " does not include required script " + script);
