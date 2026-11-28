@@ -121,7 +121,7 @@ def parse_detail(html: str, page_url: str) -> dict:
         }
     description = parser.metas.get("og:description") or parser.metas.get("description") or ""
     page_text = " ".join(parser.text)
-    status_match = re.search(r"\\bStatus\\s+(ongoing|completed|hiatus|dropped)\\b", page_text, re.I)
+    status_match = re.search(r"\bStatus\s+(ongoing|completed|hiatus|dropped)\b", page_text, re.I)
     status_map = {
         "ongoing": "مستمر",
         "completed": "مكتمل",
@@ -129,7 +129,7 @@ def parse_detail(html: str, page_url: str) -> dict:
         "dropped": "دروب",
     }
     status = status_map.get(status_match.group(1).lower(), "مستمر") if status_match else "مستمر"
-    type_match = re.search(r"\\bType\\s+(manhwa|manga|manhua)\\b", page_text, re.I)
+    type_match = re.search(r"\bType\s+(manhwa|manga|manhua)\b", page_text, re.I)
     type_map = {"manhwa": "مانهوا", "manga": "مانجا", "manhua": "مانهوا"}
     work_type = type_map.get(type_match.group(1).lower(), "مانهوا") if type_match else "مانهوا"
     return {
