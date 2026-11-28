@@ -13,6 +13,8 @@ import os
 import socket
 import time
 import uuid
+from datetime import datetime, timezone, timedelta
+from urllib.parse import urlencode
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -179,7 +181,7 @@ def _discover(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -
                     "external_work_id": str(work_id), "external_chapter_id": str(chapter_id),
                     "payload": payload,
                 })
-    supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {"status": "completed", "completed_at": "now()", "last_error": None, "locked_at": None, "locked_by": None})
+    supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(), "last_error": None, "locked_at": None, "locked_by": None})
 
 
 def _fetch_chapter(supabase: Supabase, source: dict[str, Any], job: dict[str, Any]) -> None:
@@ -218,7 +220,33 @@ def _fetch_chapter(supabase: Supabase, source: dict[str, Any], job: dict[str, An
         supabase.update("site_chapter_processing_jobs", "id=eq." + processing[0]["id"], fields)
     else:
         supabase.insert("site_chapter_processing_jobs", {"chapter_id": chapter_id, **fields})
-    supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {"status": "completed", "completed_at": "now()", "last_error": None, "locked_at": None, "locked_by": None})
+    supabase.update("site_ingestion_jobs", "id=eq." + job["id"], {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(), "last_error": None, "locked_at": None, "locked_by": None})
+
+
+def schedule_discovery(supabase: Supabase) -> None:
+    """Queue periodic discovery for each enabled, authorized JSON feed."""
+    sources = supabase.rows(
+        "site_content_sources",
+        "select=id,adapter_key,enabled,authorization_status,poll_interval_minutes&enabled=eq.true&authorization_status=eq.authorized&adapter_key=eq.galaxite_json_feed",
+    )
+    now = datetime.now(timezone.utc)
+    for source in sources:
+        interval = max(5, min(1440, int(source.get("poll_interval_minutes") or 60)))
+        cutoff = (now - timedelta(minutes=interval)).isoformat()
+        query = urlencode({
+            "select": "id",
+            "source_id": f"eq.{source['id']}",
+            "job_type": "eq.discover_works",
+            "created_at": f"gte.{cutoff}",
+            "limit": "1",
+        })
+        recent = supabase.rows("site_ingestion_jobs", query)
+        if not recent:
+            supabase.insert("site_ingestion_jobs", {
+                "source_id": source["id"],
+                "job_type": "discover_works",
+                "payload": {"trigger": "scheduled_poll"},
+            })
 
 
 def process_one(supabase: Supabase, worker_id: str) -> bool:
@@ -256,8 +284,12 @@ def main() -> None:
     idle = max(2, int(os.getenv("POLL_SECONDS", "15")))
     supabase = Supabase(url, key)
     LOG.info("Galaxite ingestion worker started: %s", worker_id)
+    last_schedule = 0.0
     while True:
         try:
+            if time.monotonic() - last_schedule >= 30:
+                schedule_discovery(supabase)
+                last_schedule = time.monotonic()
             if not process_one(supabase, worker_id):
                 time.sleep(idle)
         except KeyboardInterrupt:
