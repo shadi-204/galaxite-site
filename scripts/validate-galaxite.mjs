@@ -97,12 +97,24 @@ for (const [htmlName, required] of Object.entries(requiredScripts)) {
   }
 }
 
-for (const file of jsFiles) {
-  const source = readFileSync(file, "utf8");
+// Scan repository text files, not only browser JavaScript. Exclude this validator because
+// it necessarily contains the detection patterns themselves.
+for (const file of files) {
   const relativeName = infoPath(file);
-  if (/\bsb_secret_[A-Za-z0-9_-]{12,}/i.test(source)) fail("Potential Supabase secret key in " + relativeName);
-  if (/SERVICE_ROLE_KEY\s*[:=]\s*["'][^"']{20,}/i.test(source)) fail("Potential service-role secret in " + relativeName);
-  if (/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(source)) fail("Private key material found in " + relativeName);
+  if (relativeName === "scripts/validate-galaxite.mjs") continue;
+  const source = readFileSync(file, "utf8");
+  const secretPatterns = [
+    [/\\bsb_secret_[A-Za-z0-9_-]{12,}/i, "Supabase secret key"],
+    [/SERVICE_ROLE_KEY\\s*[:=]\\s*["'][^"']{20,}/i, "service-role secret"],
+    [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, "private key material"],
+    [/\\bAKIA[0-9A-Z]{16}\\b/, "AWS access key"],
+    [/\\bgh[pousr]_[A-Za-z0-9]{30,}\\b/, "GitHub token"],
+    [/\\bsk_live_[A-Za-z0-9]{20,}\\b/, "Stripe live secret"],
+    [/\\bxox[baprs]-[A-Za-z0-9-]{10,}\\b/, "Slack token"]
+  ];
+  for (const [pattern, label] of secretPatterns) {
+    if (pattern.test(source)) fail("Potential " + label + " in " + relativeName);
+  }
 }
 
 const serviceWorker = resolve(ROOT, "sw.js");
