@@ -30,7 +30,7 @@ function cover(w, cls = "") {
     : `<div class="cover art ${cls}" style="background:${grad(w.title)};--h:${hue(w.title)}"><b class="ini">${esc([...w.title][0].toUpperCase())}</b><span>${esc(w.title)}</span></div>`;
 }
 function cardM(w) {
-  return card(w, `<b class="rate">⭐ ${w.rating}</b>`).replace(/<\/a>$/, `<span class="meta"><i>${Array.isArray(w.publishedChapters) ? w.publishedChapters.length : w.chapters} فصل</i><i class="${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</i></span></a>`);
+  return card(w, `<b class="rate">⭐ ${w.ratingCount ? Number(w.rating).toFixed(1) : "—"}</b>`).replace(/<\/a>$/, `<span class="meta"><i>${Array.isArray(w.publishedChapters) ? w.publishedChapters.length : w.chapters} فصل</i><i class="${w.status === "مستمر" ? "on" : ""}"><u></u>${esc(w.status)}</i></span></a>`);
 }
 function rowOf(title, list) {
   return `<div class="rh"><h3 class="h">${title}</h3><span class="arr"><button data-d="1" aria-label="السابق">›</button><button data-d="-1" aria-label="التالي">‹</button></span></div><div class="row">${list.map(cardM).join("")}</div>`;
